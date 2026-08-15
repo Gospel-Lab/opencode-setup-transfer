@@ -209,6 +209,47 @@ EOG
   esac
 }
 
+# 로그인만으로는 부족한 서비스가 있다. 프로젝트를 먼저 만들어야 실제로 쓸 수 있다.
+needs_project() {
+  case "$1" in firebase|supabase) return 0 ;; *) return 1 ;; esac
+}
+
+project_guide() {
+  case "$1" in
+    firebase)
+      cat <<'EOG'
+  Firebase 는 로그인만으로는 쓸 수 없습니다. **프로젝트**를 먼저 만들어야 합니다.
+  이미 만드셨다면 이 단계는 건너뛰세요.
+
+    1. 브라우저에 열린 Firebase 콘솔에서 "프로젝트 만들기" 를 누릅니다
+    2. 프로젝트 이름을 정합니다 (예: my-church-app)
+       - 영문 소문자와 하이픈만 쓰는 것이 안전합니다
+    3. Google 애널리틱스는 "사용 안 함" 으로 두어도 됩니다 (나중에 켤 수 있습니다)
+    4. "프로젝트 만들기" → 1~2분 기다리면 완성됩니다
+
+  만든 프로젝트를 이 컴퓨터의 작업 폴더와 연결할 때는 그 폴더에서:
+       firebase use --add
+EOG
+      ;;
+    supabase)
+      cat <<'EOG'
+  Supabase 도 **프로젝트**를 먼저 만들어야 데이터베이스가 생깁니다.
+  이미 만드셨다면 건너뛰세요.
+
+    1. 브라우저에 열린 대시보드에서 "New project" 를 누릅니다
+    2. 조직(Organization)이 없으면 먼저 하나 만듭니다 — 이름은 아무거나 괜찮습니다
+    3. 프로젝트 이름과 **데이터베이스 비밀번호**를 정합니다
+       ⚠️ 이 비밀번호는 다시 볼 수 없습니다. 지금 안전한 곳에 적어 두세요
+    4. 지역(Region)은 Northeast Asia (Seoul) 이 가장 빠릅니다
+    5. "Create new project" → 2~3분 기다리면 완성됩니다
+
+  만든 프로젝트를 작업 폴더와 연결할 때는 그 폴더에서:
+       supabase link --project-ref <프로젝트 ID>
+EOG
+      ;;
+  esac
+}
+
 signup_url() {
   case "$1" in
     github) echo "https://github.com/signup" ;;
@@ -311,6 +352,13 @@ for svc in $SERVICES; do
   dim "  가입 주소: $(signup_url "$svc")"
   if confirm "가입 페이지를 열어드릴까요?"; then
     open_url "$(signup_url "$svc")" && ok "브라우저를 열었습니다." || bad "브라우저를 못 열었습니다. 위 주소를 직접 입력하세요."
+    pause >/dev/null || true
+  fi
+
+  # 2-1) 프로젝트를 먼저 만들어야 하는 서비스
+  if needs_project "$svc"; then
+    echo
+    project_guide "$svc"
     pause >/dev/null || true
   fi
 

@@ -175,7 +175,13 @@ record_links() { # src label
     if [ ! -e "$l" ]; then
       echo "- [$2] \`$name\` ← \`$tgt\` (⚠️ 원본 없음 — 제외)" >> "$STAGE/SYMLINKS.md"; continue
     fi
-    sz=$(du -sm -L "$l" 2>/dev/null | cut -f1); sz="${sz:-0}"
+    # 자기 자신을 가리키는 순환 링크는 du 도 복사도 무한히 돈다. 크기를 못 재면 순환으로 보고 뺀다.
+    sz="$(du -sm -L "$l" 2>/dev/null | cut -f1)" || sz=""
+    if [ -z "$sz" ]; then
+      echo "$name" >> "$EXCLUDE_FILE"
+      echo "- [$2] \`$name\` ← \`$tgt\` (⚠️ 순환 링크로 보입니다 — **제외**)" >> "$STAGE/SYMLINKS.md"
+      continue
+    fi
     if [ "$sz" -gt "$BIG_LIMIT_MB" ]; then
       echo "$name" >> "$EXCLUDE_FILE"
       echo "- [$2] \`$name\` ← \`$tgt\` (${sz}MB — **제외**, 원본 도구를 새 컴퓨터에 따로 설치하세요)" >> "$STAGE/SYMLINKS.md"
