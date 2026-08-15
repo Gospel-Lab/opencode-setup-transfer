@@ -79,4 +79,4 @@ scripts/connections.sh setup    # 이 컴퓨터에 필요한 로그인 안내
 
 ## 이 스킬의 범위 밖
 
-`~/.hermes`, Obsidian vault, VPS 상태, `~/.ssh`, 프로젝트별 환경변수. Claude Code 설정 이전은 `~/.claude/skills/claude-setup-transfer` 가 따로 있습니다.
+`~/.ssh`, 프로젝트별 환경변수(`.env`), 각 서비스의 프로젝트 설정. 이 도구는 opencode 설정과 계정 연결까지만 다룹니다.

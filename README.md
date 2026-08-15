@@ -69,11 +69,11 @@ connect.sh check
 ```
 서비스 연결 상태
 
-  GitHub     연결됨  Gospel-Lab
-  Firebase   연결됨  me@gmail.com
+  GitHub     연결됨  my-github-id
+  Firebase   연결됨  me@example.com
   Vercel     로그인 필요   vercel login
   Supabase   설치 안 됨    brew install supabase/tap/supabase
-  Netlify    연결됨  me@gmail.com
+  Netlify    연결됨  me@example.com
 ```
 
 특정 서비스만 하고 싶으면 이름을 붙이세요 — `connect.sh wizard firebase`
@@ -116,7 +116,7 @@ export.sh --mode share
 전역 지침과 계정 정보를 빼고 만듭니다. 비밀값이나 본인 식별정보(계정명·이메일·호스트명)가 발견되면 **파일을 아예 만들지 않습니다.** 특정 파일이 걸리면 빼고 다시 실행하세요.
 
 ```bash
-export.sh --mode share --exclude git-account.sh
+export.sh --mode share --exclude my-private-script.sh
 ```
 
 ---
