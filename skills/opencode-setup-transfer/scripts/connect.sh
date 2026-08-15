@@ -14,6 +14,32 @@ ONLY="${2:-}"         # github | firebase | vercel | supabase | netlify
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# 로그인이 안 된 상태에서 CLI 를 부르면 브라우저 로그인 창을 띄우거나 입력을 기다리며 멈춘다.
+# 그래서 먼저 "인증 파일이 있는가"만 파일로 확인하고, 있을 때만 CLI 에게 계정명을 묻는다.
+# 모든 호출은 stdin 을 끊어(</dev/null) 어떤 경우에도 사용자 입력을 기다리지 못하게 한다.
+authed() { # 서비스 → 인증 흔적이 있으면 0
+  case "$1" in
+    vercel)
+      [ -s "$HOME/Library/Application Support/com.vercel.cli/auth.json" ] || \
+      [ -s "$HOME/.local/share/com.vercel.cli/auth.json" ] || \
+      [ -n "${VERCEL_TOKEN:-}" ] ;;
+    netlify)
+      [ -s "$HOME/Library/Preferences/netlify/config.json" ] || \
+      [ -s "$HOME/.config/netlify/config.json" ] || \
+      [ -n "${NETLIFY_AUTH_TOKEN:-}" ] ;;
+    firebase)
+      [ -s "$HOME/.config/configstore/firebase-tools.json" ] || \
+      [ -n "${FIREBASE_TOKEN:-}" ] ;;
+    supabase)
+      [ -s "$HOME/.supabase/access-token" ] || \
+      [ -s "$HOME/Library/Application Support/supabase/access-token" ] || \
+      [ -n "${SUPABASE_ACCESS_TOKEN:-}" ] ;;
+    github) return 0 ;;   # gh auth status 는 로그인 창을 띄우지 않는다
+    *) return 1 ;;
+  esac
+}
+
+
 tmo() { # 초 명령... — 로그인 대기로 멈추지 않게
   local s="$1"; shift
   "$@" & local p=$!
@@ -84,11 +110,11 @@ strip_ansi() { sed -E $'s/\033\\[[0-9;]*[A-Za-z]//g'; }
 
 status_of() { # 서비스 → "계정명" 출력, 미연결이면 빈 문자열
   case "$1" in
-    github)   tmo 8  gh auth status 2>&1 | strip_ansi | grep -oE 'account [A-Za-z0-9_-]+' | awk '{print $2}' | paste -sd, - ;;
-    firebase) tmo 12 firebase login:list 2>/dev/null | strip_ansi | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+' | head -1 ;;
-    vercel)   tmo 12 vercel whoami 2>/dev/null | strip_ansi | tail -1 | tr -d '[:space:]' | grep -E '^[A-Za-z0-9_-]{1,39}$' ;;
-    supabase) tmo 12 supabase projects list 2>/dev/null | grep -qE '\|' && echo "연결됨" ;;
-    netlify)  tmo 12 netlify status 2>/dev/null | strip_ansi | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+' | head -1 ;;
+    github)   tmo 8  gh auth status </dev/null 2>&1 | strip_ansi | grep -oE 'account [A-Za-z0-9_-]+' | awk '{print $2}' | paste -sd, - ;;
+    firebase) authed firebase && tmo 12 firebase login:list </dev/null 2>/dev/null | strip_ansi | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+' | head -1 ;;
+    vercel)   authed vercel && tmo 12 vercel whoami </dev/null 2>/dev/null | strip_ansi | tail -1 | tr -d '[:space:]' | grep -E '^[A-Za-z0-9_-]{1,39}$' ;;
+    supabase) authed supabase && tmo 12 supabase projects list </dev/null 2>/dev/null | grep -qE '\|' && echo "연결됨" ;;
+    netlify)  authed netlify && tmo 12 netlify status </dev/null 2>/dev/null | strip_ansi | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+' | head -1 ;;
   esac
 }
 

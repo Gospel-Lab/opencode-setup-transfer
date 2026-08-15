@@ -178,16 +178,63 @@ PYP
   fi
 fi
 
-if [ -f "$WORK/opencode.json" ]; then
+# 설정 파일은 opencode.json 과 opencode.jsonc 두 형식이 모두 쓰인다.
+# .jsonc 를 빠뜨리면 그 사용자의 설정이 통째로 적용되지 않은 채 조용히 사라진다.
+SRC_CFG=""
+for cand in opencode.jsonc opencode.json; do
+  [ -f "$WORK/$cand" ] && { SRC_CFG="$cand"; break; }
+done
+
+if [ -n "$SRC_CFG" ]; then
+  # 대상 파일은 이 컴퓨터에 이미 있는 형식을 따른다. 없으면 가져온 형식을 그대로 쓴다.
+  DST_CFG=""
+  for cand in opencode.jsonc opencode.json; do
+    [ -f "$CONF/$cand" ] && { DST_CFG="$cand"; break; }
+  done
+  DST_CFG="${DST_CFG:-$SRC_CFG}"
+
   echo
-  echo "--- opencode.json"
-  if ask "  병합할까요? (기존 값은 백업 후, 겹치는 키는 새 값으로)"; then
-    [ -f "$CONF/opencode.json" ] && cp "$CONF/opencode.json" "$BACKUP/opencode.json"
-    python3 - "$WORK/opencode.json" "$CONF/opencode.json" <<'PY'
-import json, os, sys
+  echo "--- 설정 파일 ($SRC_CFG → $DST_CFG)"
+  if ask "  적용할까요?"; then
+    if [ ! -f "$CONF/$DST_CFG" ]; then
+      # 대상이 비어 있으면 그대로 복사한다. 주석까지 살아남는다.
+      cp "$WORK/$SRC_CFG" "$CONF/$DST_CFG"
+      echo "  복사 완료"
+      grep -o '<<<REDACTED:[^>]*>>>' "$CONF/$DST_CFG" 2>/dev/null | sed 's/<<<REDACTED:/    직접 채워야 함: /; s/>>>//' | sort -u
+    else
+      cp "$CONF/$DST_CFG" "$BACKUP/$DST_CFG"
+      python3 - "$WORK/$SRC_CFG" "$CONF/$DST_CFG" <<'PYCFG'
+import json, os, re, sys
 src, dst = sys.argv[1], sys.argv[2]
-new = json.load(open(src))
-cur = json.load(open(dst)) if os.path.exists(dst) else {}
+
+def load(path):
+    """주석이 있는 jsonc 도 읽는다. 문자열 안의 // 는 건드리지 않는다."""
+    raw = open(path).read()
+    out, i, in_str, esc = [], 0, False, False
+    while i < len(raw):
+        c = raw[i]
+        if in_str:
+            out.append(c)
+            if esc: esc = False
+            elif c == "\\": esc = True
+            elif c == '"': in_str = False
+            i += 1; continue
+        if c == '"':
+            in_str = True; out.append(c); i += 1; continue
+        if c == '/' and i + 1 < len(raw):
+            if raw[i+1] == '/':
+                while i < len(raw) and raw[i] != '\n': i += 1
+                continue
+            if raw[i+1] == '*':
+                j = raw.find('*/', i + 2)
+                i = len(raw) if j < 0 else j + 2
+                continue
+        out.append(c); i += 1
+    text = re.sub(r',(\s*[}\]])', r'\1', ''.join(out))   # 후행 쉼표 제거
+    return json.loads(text) if text.strip() else {}
+
+new = load(src)
+cur = load(dst) if os.path.exists(dst) else {}
 
 def deep(a, b):
     out = dict(a)
@@ -211,11 +258,11 @@ def walk(o, p=""):
         red.append(p.lstrip("."))
 walk(merged)
 json.dump(merged, open(dst, "w"), indent=2, ensure_ascii=False)
-print("  병합 완료")
-if red:
-    print("  ⚠️ 직접 채워야 하는 값:")
-    for r in red: print("    ", r)
-PY
+print("  병합 완료 (기존 파일은 백업에 있습니다 — 주석이 있었다면 거기서 확인하세요)")
+for r in red:
+    print("    직접 채워야 함:", r)
+PYCFG
+    fi
   fi
 fi
 
@@ -259,7 +306,7 @@ echo
 echo "==================== 남은 작업 ===================="
 echo "1. opencode auth login  — AI 제공자에 본인 API 키로 연결"
 [ -f "$WORK/PLUGINS.md" ] && { echo "2. 플러그인 설치:"; sed 's/^/     /' "$WORK/PLUGINS.md"; }
-echo "3. opencode.json 의 <<<REDACTED:...>>> 값 직접 채우기"
+echo "3. 설정 파일의 <<<REDACTED:...>>> 값 직접 채우기"
 echo "4. 위 「아직 해야 할 것」의 로그인 명령 실행"
 echo "5. opencode 를 종료했다가 다시 실행 (설정은 시작할 때 한 번만 읽습니다)"
 echo

@@ -18,6 +18,32 @@ show() { [ "$SHOW_ACCOUNT" = "masked" ] && mask "$1" || printf '%s' "$1"; }
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# 로그인이 안 된 상태에서 CLI 를 부르면 브라우저 로그인 창을 띄우거나 입력을 기다리며 멈춘다.
+# 그래서 먼저 "인증 파일이 있는가"만 파일로 확인하고, 있을 때만 CLI 에게 계정명을 묻는다.
+# 모든 호출은 stdin 을 끊어(</dev/null) 어떤 경우에도 사용자 입력을 기다리지 못하게 한다.
+authed() { # 서비스 → 인증 흔적이 있으면 0
+  case "$1" in
+    vercel)
+      [ -s "$HOME/Library/Application Support/com.vercel.cli/auth.json" ] || \
+      [ -s "$HOME/.local/share/com.vercel.cli/auth.json" ] || \
+      [ -n "${VERCEL_TOKEN:-}" ] ;;
+    netlify)
+      [ -s "$HOME/Library/Preferences/netlify/config.json" ] || \
+      [ -s "$HOME/.config/netlify/config.json" ] || \
+      [ -n "${NETLIFY_AUTH_TOKEN:-}" ] ;;
+    firebase)
+      [ -s "$HOME/.config/configstore/firebase-tools.json" ] || \
+      [ -n "${FIREBASE_TOKEN:-}" ] ;;
+    supabase)
+      [ -s "$HOME/.supabase/access-token" ] || \
+      [ -s "$HOME/Library/Application Support/supabase/access-token" ] || \
+      [ -n "${SUPABASE_ACCESS_TOKEN:-}" ] ;;
+    github) return 0 ;;   # gh auth status 는 로그인 창을 띄우지 않는다
+    *) return 1 ;;
+  esac
+}
+
+
 # 외부 CLI 는 로그인 대기·네트워크로 멈출 수 있다. 반드시 제한 시간을 건다.
 tmo() { # 초 명령...
   local s="$1"; shift
@@ -43,7 +69,7 @@ if [ "$MODE" = "report" ]; then
 
   # --- GitHub
   if have gh; then
-    accounts="$(tmo 8 gh auth status 2>&1 | grep -oE 'account [A-Za-z0-9_-]+' | awk '{print $2}' | sort -u)"
+    accounts="$(tmo 8 gh auth status </dev/null 2>&1 | grep -oE 'account [A-Za-z0-9_-]+' | awk '{print $2}' | sort -u)"
     if [ -n "$accounts" ]; then
       echo "## GitHub (gh CLI)"
       while IFS= read -r a; do
@@ -57,7 +83,7 @@ if [ "$MODE" = "report" ]; then
 
   # --- Firebase
   if have firebase; then
-    fb="$(tmo 12 firebase login:list 2>/dev/null | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+' | head -1)"
+    fb="$(authed firebase && tmo 12 firebase login:list </dev/null 2>/dev/null | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+' | head -1)"
     if [ -n "$fb" ]; then
       echo "## Firebase"
       echo "- 계정 \`$(show "$fb")\` 로 로그인돼 있었습니다"
@@ -67,7 +93,7 @@ if [ "$MODE" = "report" ]; then
 
   # --- Vercel
   if have vercel || have npx; then
-    vc="$(tmo 12 vercel whoami 2>/dev/null | tail -1 | tr -d '[:space:]')"
+    vc="$(authed vercel && tmo 12 vercel whoami </dev/null 2>/dev/null | tail -1 | tr -d '[:space:]')"
     echo "## Vercel"
     if [ -n "$vc" ] && [ "${#vc}" -lt 40 ]; then
       echo "- 계정 \`$(show "$vc")\` 로 로그인돼 있었습니다"
@@ -108,8 +134,8 @@ if [ "$MODE" = "setup" ]; then
   TODO=""
 
   if have gh; then
-    if tmo 8 gh auth status >/dev/null 2>&1; then
-      acct="$(tmo 8 gh auth status 2>&1 | grep -oE 'account [A-Za-z0-9_-]+' | awk '{print $2}' | paste -sd, -)"
+    if tmo 8 gh auth status </dev/null >/dev/null 2>&1; then
+      acct="$(tmo 8 gh auth status </dev/null 2>&1 | grep -oE 'account [A-Za-z0-9_-]+' | awk '{print $2}' | paste -sd, -)"
       status "GitHub" "설치됨" "로그인됨 ($acct)"
     else
       status "GitHub" "설치됨" "로그인 필요"
@@ -124,7 +150,7 @@ gh auth login"
   fi
 
   if have firebase; then
-    fb="$(tmo 12 firebase login:list 2>/dev/null | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+' | head -1)"
+    fb="$(authed firebase && tmo 12 firebase login:list </dev/null 2>/dev/null | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+' | head -1)"
     if [ -n "$fb" ]; then status "Firebase" "설치됨" "로그인됨 ($fb)"
     else
       status "Firebase" "설치됨" "로그인 필요"
@@ -136,7 +162,7 @@ firebase login                     # Firebase 로그인 (브라우저)"
   fi
 
   if have vercel; then
-    vc="$(tmo 12 vercel whoami 2>/dev/null | tail -1 | tr -d '[:space:]')"
+    vc="$(authed vercel && tmo 12 vercel whoami </dev/null 2>/dev/null | tail -1 | tr -d '[:space:]')"
     if [ -n "$vc" ] && [ "${#vc}" -lt 40 ]; then status "Vercel" "설치됨" "로그인됨 ($vc)"
     else
       status "Vercel" "설치됨" "로그인 필요"

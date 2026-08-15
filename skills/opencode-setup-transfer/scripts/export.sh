@@ -227,6 +227,30 @@ if len(lines) > 4:
         f.write("\n".join(lines) + "\n")
 PY
 
+# opencode.jsonc — 주석이 들어갈 수 있어 JSON 파서로 다시 쓰면 주석이 날아간다.
+# 그래서 값만 정규식으로 치환한다. 이걸 빠뜨리면 jsonc 사용자의 키가 그대로 나간다.
+if [ -f "$PAY/opencode.jsonc" ]; then
+  python3 - "$PAY/opencode.jsonc" <<'PYC'
+import re, sys
+p = sys.argv[1]
+t = open(p).read()
+hit = []
+def sub(m):
+    hit.append(m.group(1))
+    return '%s"%s": "<<<REDACTED:%s>>>"' % (m.group(0)[:m.start(1)-m.start(0)-1], m.group(1), m.group(1))
+pat = re.compile(r'"((?:[A-Za-z_]*)(?:apiKey|api_key|token|secret|password|Authorization)(?:[A-Za-z_]*))"\s*:\s*"(?!\{env:)(?!<<<REDACTED)[^"]{8,}"', re.I)
+def repl(m):
+    hit.append(m.group(1))
+    return '"%s": "<<<REDACTED:%s>>>"' % (m.group(1), m.group(1))
+t2 = pat.sub(repl, t)
+if hit:
+    open(p, "w").write(t2)
+    print("  opencode.jsonc 자리표시자로 치환:", ", ".join(sorted(set(hit))))
+else:
+    print("  opencode.jsonc 에 치환할 비밀값 없음")
+PYC
+fi
+
 echo "== 3/6 연결 서비스 목록 작성"
 if [ "$MODE" = "personal" ]; then
   bash "$HERE/connections.sh" report full > "$STAGE/CONNECTIONS.md" 2>/dev/null || true
