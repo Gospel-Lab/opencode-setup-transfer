@@ -16,7 +16,19 @@ Got a new laptop? Work across a home and an office machine? You don't have to re
 
 ## Install
 
-One line, on both machines.
+### Easiest — let your AI do it
+
+Open your AI coding tool (opencode, Claude Code, or codex) and paste this:
+
+```
+Install this repository on my computer. Follow the instructions in AGENTS.md.
+https://github.com/Gospel-Lab/ai-setup-transfer
+```
+
+The repo ships an [AGENTS.md](AGENTS.md) with exact install steps, so the agent knows where files go.
+Restart your AI tool afterwards so the new skill is picked up.
+
+### Or one line, on both machines.
 
 **Windows** (PowerShell, no admin rights needed):
 
