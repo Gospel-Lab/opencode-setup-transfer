@@ -44,13 +44,42 @@ cd opencode-setup && ./import.sh
 **묻지 않고 전부 적용합니다.** 기존 파일이 있으면 백업한 뒤 덮어씁니다.
 항목마다 확인하고 싶으면 `./import.sh --ask`.
 
-### 3. 서비스 다시 로그인
+### 3. 서비스 다시 로그인 — 연결 도우미
 
-가져오기가 끝나면 무엇에 로그인해야 하는지 화면에 그대로 나옵니다. 언제든 다시 볼 수 있습니다.
+터미널이 낯설어도 괜찮습니다. 마법사가 **한 서비스씩 손을 잡고** 갑니다.
 
 ```bash
-~/.config/opencode/skills/opencode-setup-transfer/scripts/connections.sh setup
+~/.config/opencode/skills/opencode-setup-transfer/scripts/connect.sh wizard
 ```
+
+**GitHub · Firebase · Vercel · Supabase · Netlify** 다섯 곳을 지원합니다. 각 서비스마다:
+
+1. 프로그램이 없으면 **설치 명령을 알려주고 대신 설치**합니다
+2. 계정이 없으면 **가입 페이지를 브라우저로 열어**줍니다
+3. 로그인할 때 **화면에 무엇이 뜨고 어디를 눌러야 하는지** 그림으로 보여줍니다
+4. 끝나면 **정말 연결됐는지 자동으로 확인**하고, 안 됐으면 원인을 짚어줍니다
+5. 이미 연결된 서비스는 **건너뜁니다**. 안 쓰는 서비스도 건너뛸 수 있습니다
+
+상태만 빠르게 보려면:
+
+```bash
+connect.sh check
+```
+
+```
+서비스 연결 상태
+
+  GitHub     연결됨  Gospel-Lab
+  Firebase   연결됨  me@gmail.com
+  Vercel     로그인 필요   vercel login
+  Supabase   설치 안 됨    brew install supabase/tap/supabase
+  Netlify    연결됨  me@gmail.com
+```
+
+특정 서비스만 하고 싶으면 이름을 붙이세요 — `connect.sh wizard firebase`
+
+> 로그인을 **대신 해 주지는 않습니다.** 비밀번호와 2단계 인증은 본인만 다뤄야 하고,
+> 로그인 화면은 수시로 바뀌어 자동화하면 곧 깨집니다. 대신 길을 끝까지 안내합니다.
 
 ---
 

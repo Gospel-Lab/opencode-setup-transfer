@@ -244,6 +244,17 @@ if [ -f "$SRC/connections.sh" ]; then
   bash "$SRC/connections.sh" setup || true
 fi
 
+# 연결 마법사 안내 — 터미널이 낯선 사람은 이걸로 손 잡고 진행한다
+WIZ="$CONF/skills/opencode-setup-transfer/scripts/connect.sh"
+if [ -f "$WIZ" ]; then
+  echo
+  echo "== 서비스 연결을 도와드립니다"
+  echo "  GitHub·Firebase·Vercel·Supabase·Netlify 를 하나씩 안내받으려면:"
+  echo "     $WIZ wizard"
+  echo "  지금 상태만 보려면:"
+  echo "     $WIZ check"
+fi
+
 echo
 echo "==================== 남은 작업 ===================="
 echo "1. opencode auth login  — AI 제공자에 본인 API 키로 연결"
