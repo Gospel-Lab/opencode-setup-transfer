@@ -29,11 +29,14 @@ if command -v git >/dev/null 2>&1; then
   git clone --depth 1 --branch "$BRANCH" "https://github.com/$REPO.git" "$TMP/repo" >/dev/null 2>&1 \
     || { echo "오류: 저장소를 내려받지 못했습니다. 인터넷 연결과 주소를 확인하세요." >&2; exit 1; }
   SRC="$TMP/repo/skills/$NAME"
+  # 폴더 이름이 바뀌었을 수도 있다. 이름 대신 SKILL.md 가 있는 폴더를 찾는다.
+  [ -d "$SRC" ] || SRC="$(find "$TMP/repo/skills" -maxdepth 2 -name 'SKILL.md' -exec dirname {} \; 2>/dev/null | head -1)"
 else
   curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH" -o "$TMP/src.tar.gz" \
     || { echo "오류: 내려받기에 실패했습니다." >&2; exit 1; }
   tar -xzf "$TMP/src.tar.gz" -C "$TMP"
   SRC="$(find "$TMP" -type d -path "*/skills/$NAME" | head -1)"
+  [ -d "$SRC" ] || SRC="$(find "$TMP" -maxdepth 4 -path '*/skills/*' -name 'SKILL.md' -exec dirname {} \; 2>/dev/null | head -1)"
 fi
 
 [ -d "$SRC" ] || { echo "오류: 저장소 안에서 스킬 폴더를 찾지 못했습니다." >&2; exit 1; }
@@ -49,6 +52,13 @@ fi
 mkdir -p "$DEST"
 cp -R "$SRC"/. "$DEST"/
 chmod +x "$DEST"/scripts/*.sh 2>/dev/null || true
+
+# 옛 이름으로 설치돼 있던 것은 정리한다. 스킬이 두 벌 잡혀 헷갈리는 것을 막는다.
+OLD="$CONF/skills/opencode-setup-transfer"
+if [ "$OLD" != "$DEST" ] && [ -d "$OLD" ]; then
+  rm -rf "$OLD"
+  echo "  옛 이름으로 설치돼 있던 것을 정리했습니다."
+fi
 
 echo
 echo "설치 완료."
