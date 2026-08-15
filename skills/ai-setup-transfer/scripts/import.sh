@@ -197,7 +197,7 @@ for tool in $TOOLS; do
     if [ ! -f "$dst" ]; then
       cp "$src" "$dst"
       echo "  복사 완료 (주석까지 그대로)"
-      grep -o '<<<REDACTED:[^>]*>>>' "$dst" 2>/dev/null | sed 's/<<<REDACTED:/    직접 채워야 함: /; s/>>>//' | sort -u
+      grep -o '<<<REDACTED:[^>]*>>>' "$dst" 2>/dev/null | sed 's/<<<REDACTED:/    직접 채워야 함: /; s/>>>//' | sort -u || true
       return 0
     fi
     mkdir -p "$BACKUP/$tool"; cp "$dst" "$BACKUP/$tool/$(basename "$dst")"
