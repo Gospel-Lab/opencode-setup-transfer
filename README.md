@@ -1,5 +1,7 @@
 # opencode 세팅 이사
 
+*[English](README.en.md)*
+
 지금 쓰는 컴퓨터의 opencode 세팅을 **파일 하나로 포장해서**, 새 컴퓨터에서 **자동으로 풀어놓는** 도구입니다.
 
 노트북을 바꿨을 때, 집과 사무실 컴퓨터를 함께 쓸 때, 그동안 만든 스킬과 설정을 처음부터 다시 만들지 않아도 됩니다.
@@ -142,6 +144,13 @@ export.sh --mode share --exclude my-private-script.sh
 | `--ask` | 항목마다 확인 |
 | `--from <파일>` | tar.gz 를 바로 지정 |
 
+**connect.sh**
+
+| 명령 | 설명 |
+|---|---|
+| `wizard [서비스]` | 안내를 받으며 연결. 서비스 이름을 주면 그것만 |
+| `check` | 현재 연결 상태 |
+
 **connections.sh**
 
 | 명령 | 설명 |
@@ -159,6 +168,9 @@ export.sh --mode share --exclude my-private-script.sh
 - **경로 템플릿화** — 파일 속 홈 경로를 `{{HOME}}` 로 바꿔 담고 복원합니다. 사용자 이름이 달라도 동작합니다.
 - **가져오기 전 백업** — `~/.config/opencode/backups/import-<시각>/` 에 남깁니다.
 - **심볼릭 링크 실체화** — opencode 는 링크된 스킬 폴더를 따라가지 않으므로 내용을 복사합니다. 5MB 초과 도구는 제외하고 `SYMLINKS.md` 에 기록합니다.
+- **외부 CLI 호출에 제한 시간** — 로그인 대기로 스크립트가 멈추지 않게 합니다.
+
+자세한 내용은 [SECURITY.md](SECURITY.md) 를 보세요.
 
 ## 요구사항
 

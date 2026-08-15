@@ -43,7 +43,7 @@ usage() {
 
   --mode personal  (기본) 내 다른 컴퓨터로 이전 — 전역 AGENTS.md·연결 계정 정보 포함
   --mode share     남에게 배포 — 개인 지침·계정 정보 제외, 개인정보 발견 시 중단
-  --out            결과 tar.gz 경로 (기본: ~/Desktop/opencode-setup-<mode>-<날짜>.tar.gz)
+  --out            결과 tar.gz 경로 (기본: 바탕화면. WSL 이면 윈도우 쪽 바탕화면)
   --exclude <이름>  특정 파일·폴더 제외 (여러 번 사용 가능)
   --config-dir     설정 폴더를 직접 지정 (기본: opencode 가 알려주는 경로)
   --force          경고를 무시하고 강행
@@ -72,7 +72,26 @@ esac
 [ -d "$CONF" ] || { echo "오류: $CONF 가 없습니다. opencode 를 한 번 실행한 뒤 다시 시도하세요." >&2; exit 1; }
 
 STAMP="$(date +%Y%m%d)"
-OUT="${OUT:-$HOME/Desktop/opencode-setup-$MODE-$STAMP.tar.gz}"
+
+# 결과 파일은 사용자가 탐색기·파인더에서 바로 찾을 수 있는 곳에 둔다.
+# WSL 의 $HOME/Desktop 은 리눅스 안쪽이라 윈도우 탐색기에서 보이지 않는다.
+# 그래서 WSL 이면 윈도우 쪽 바탕화면을 먼저 찾는다.
+default_out_dir() {
+  if grep -qi microsoft /proc/version 2>/dev/null; then
+    local up=""
+    if command -v cmd.exe >/dev/null 2>&1; then
+      up="$(cd /mnt/c 2>/dev/null && cmd.exe /c "echo %USERPROFILE%" 2>/dev/null | tr -d '\r')"
+    fi
+    if [ -n "$up" ] && command -v wslpath >/dev/null 2>&1; then
+      local wp; wp="$(wslpath -u "$up" 2>/dev/null)"
+      [ -n "$wp" ] && [ -d "$wp/Desktop" ] && { printf '%s' "$wp/Desktop"; return; }
+      [ -n "$wp" ] && [ -d "$wp" ] && { printf '%s' "$wp"; return; }
+    fi
+  fi
+  [ -d "$HOME/Desktop" ] && { printf '%s' "$HOME/Desktop"; return; }
+  printf '%s' "$HOME"
+}
+OUT="${OUT:-$(default_out_dir)/opencode-setup-$MODE-$STAMP.tar.gz}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 STAGE="$(mktemp -d)/opencode-setup"
