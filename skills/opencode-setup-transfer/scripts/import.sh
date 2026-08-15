@@ -149,6 +149,35 @@ if [ -f "$WORK/AGENTS.md" ]; then
   fi
 fi
 
+# 플러그인 의존성(package.json)을 병합한다.
+# opencode 는 시작할 때 여기 적힌 모듈을 스스로 설치하므로, 이 파일만 맞으면 플러그인이 자동 복원된다.
+if [ -f "$WORK/package.json" ]; then
+  echo
+  echo "--- 플러그인 의존성 (package.json)"
+  if ask "  병합할까요?"; then
+    [ -f "$CONF/package.json" ] && cp "$CONF/package.json" "$BACKUP/package.json"
+    python3 - "$WORK/package.json" "$CONF/package.json" <<'PYP'
+import json, os, sys
+src, dst = sys.argv[1], sys.argv[2]
+new = json.load(open(src))
+cur = json.load(open(dst)) if os.path.exists(dst) else {}
+deps = dict(cur.get("dependencies") or {})
+added = []
+for k, v in (new.get("dependencies") or {}).items():
+    if k not in deps:
+        deps[k] = v
+        added.append(k)
+cur["dependencies"] = deps
+json.dump(cur, open(dst, "w"), indent=2)
+if added:
+    print("  추가된 플러그인 %d개: %s" % (len(added), ", ".join(added)))
+    print("  → opencode 를 다시 실행하면 자동으로 설치됩니다.")
+else:
+    print("  새로 추가할 플러그인 없음")
+PYP
+  fi
+fi
+
 if [ -f "$WORK/opencode.json" ]; then
   echo
   echo "--- opencode.json"
