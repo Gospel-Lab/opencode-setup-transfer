@@ -9,7 +9,7 @@
 노트북을 바꿨을 때, 집과 사무실 컴퓨터를 함께 쓸 때, 그동안 만든 스킬과 설정을 처음부터 다시 만들지 않아도 됩니다.
 
 ```
-[옛 컴퓨터]  export.sh  →  opencode-setup-personal-….tar.gz  →  [새 컴퓨터]  import.sh
+[옛 컴퓨터]  export.sh  →  ai-setup-personal-….tar.gz  →  [새 컴퓨터]  import.sh
 ```
 
 ---
@@ -19,10 +19,10 @@
 두 컴퓨터 모두에서 한 줄이면 됩니다.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/opencode-setup-transfer/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/ai-setup-transfer/main/install.sh | bash
 ```
 
-`~/.config/opencode/skills/opencode-setup-transfer/` 에 설치됩니다.
+`~/.config/opencode/skills/ai-setup-transfer/` 에 설치됩니다.
 새 컴퓨터에서는 설치 없이 아카이브 안의 `import.sh` 를 바로 실행해도 됩니다 — 도구가 아카이브에 함께 들어 있습니다.
 
 ## 쓰는 법
@@ -30,10 +30,10 @@ curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/opencode-setup-transfer/
 ### 1. 옛 컴퓨터에서 내보내기
 
 ```bash
-~/.config/opencode/skills/opencode-setup-transfer/scripts/export.sh
+~/.config/opencode/skills/ai-setup-transfer/scripts/export.sh
 ```
 
-바탕화면에 `opencode-setup-personal-<날짜>.tar.gz` 가 생깁니다. 보통 1~5MB라 메일로도 보낼 수 있습니다.
+바탕화면에 `ai-setup-personal-<날짜>.tar.gz` 가 생깁니다. 보통 1~5MB라 메일로도 보낼 수 있습니다.
 
 ### 2. 새 컴퓨터에서 가져오기
 
@@ -41,8 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/opencode-setup-transfer/
 
 ```bash
 cd ~/Downloads
-tar -xzf opencode-setup-personal-*.tar.gz
-cd opencode-setup && ./import.sh
+tar -xzf ai-setup-personal-*.tar.gz
+cd ai-setup && ./import.sh
 ```
 
 **묻지 않고 전부 적용합니다.** 기존 파일이 있으면 백업한 뒤 덮어씁니다.
@@ -53,7 +53,7 @@ cd opencode-setup && ./import.sh
 터미널이 낯설어도 괜찮습니다. 마법사가 **한 서비스씩 손을 잡고** 갑니다.
 
 ```bash
-~/.config/opencode/skills/opencode-setup-transfer/scripts/connect.sh wizard
+~/.config/opencode/skills/ai-setup-transfer/scripts/connect.sh wizard
 ```
 
 **GitHub · Firebase · Vercel · Supabase · Netlify** 다섯 곳을 지원합니다. 각 서비스마다:

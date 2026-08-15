@@ -52,8 +52,9 @@ done
 SRC="${SRC:-$(cd "$(dirname "$0")" && pwd)}"
 if [ -f "$SRC" ]; then
   TMP="$(mktemp -d)"; tar -xzf "$SRC" -C "$TMP"
-  SRC="$(find "$TMP" -maxdepth 2 -type d -name 'opencode-setup' | head -1)"
-  [ -n "$SRC" ] || { echo "오류: 아카이브에서 opencode-setup 디렉터리를 찾지 못했습니다." >&2; exit 1; }
+  # 새 이름(ai-setup)과 옛 이름(opencode-setup) 모두 받아들인다
+  SRC="$(find "$TMP" -maxdepth 2 -type d \( -name 'ai-setup' -o -name 'opencode-setup' \) | head -1)"
+  [ -n "$SRC" ] || { echo "오류: 아카이브에서 세팅 폴더를 찾지 못했습니다." >&2; exit 1; }
 fi
 PAY="$SRC/payload"
 [ -d "$PAY" ] || { echo "오류: $PAY 가 없습니다." >&2; exit 1; }
@@ -312,7 +313,7 @@ if [ -f "$SRC/connections.sh" ]; then
 fi
 
 # 연결 마법사 안내 — 터미널이 낯선 사람은 이걸로 손 잡고 진행한다
-WIZ="$CONF/skills/opencode-setup-transfer/scripts/connect.sh"
+WIZ="$CONF/skills/ai-setup-transfer/scripts/connect.sh"
 if [ -f "$WIZ" ]; then
   echo
   echo "== 서비스 연결을 도와드립니다"

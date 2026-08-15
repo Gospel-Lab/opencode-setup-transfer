@@ -91,10 +91,10 @@ default_out_dir() {
   [ -d "$HOME/Desktop" ] && { printf '%s' "$HOME/Desktop"; return; }
   printf '%s' "$HOME"
 }
-OUT="${OUT:-$(default_out_dir)/opencode-setup-$MODE-$STAMP.tar.gz}"
+OUT="${OUT:-$(default_out_dir)/ai-setup-$MODE-$STAMP.tar.gz}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
-STAGE="$(mktemp -d)/opencode-setup"
+STAGE="$(mktemp -d)/ai-setup"
 PAY="$STAGE/payload"
 mkdir -p "$PAY"
 EXCLUDE_FILE="$(dirname "$STAGE")/excludes.txt"
@@ -508,4 +508,4 @@ echo "완료: $OUT"
 echo "크기: $(du -h "$OUT" | cut -f1)"
 echo
 echo "새 컴퓨터에서:"
-echo "  tar -xzf $(basename "$OUT") && cd opencode-setup && ./import.sh"
+echo "  tar -xzf $(basename "$OUT") && cd ai-setup && ./import.sh"

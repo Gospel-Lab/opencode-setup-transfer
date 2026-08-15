@@ -1,5 +1,5 @@
 ---
-name: opencode-setup-transfer
+name: ai-setup-transfer
 description: Use when moving AI coding tool setups (opencode, Claude Code, codex — configs, agents, commands, skills, themes, plugins, global instructions) and connected services (GitHub/Firebase/Vercel/Supabase/Netlify) from one computer to another, backing them up, or packaging them for others. Triggers — "opencode 세팅 옮기기", "다른 컴퓨터에 세팅 이사", "새 노트북에 그대로 설치", "수강생에게 세팅 배포", "깃허브·파이어베이스·버셀 연결도 같이", "export/import opencode config".
 ---
 
@@ -24,18 +24,18 @@ description: Use when moving AI coding tool setups (opencode, Claude Code, codex
 
 ```bash
 # 기본이 personal 이라 옵션 없이 실행하면 내 이사용 아카이브가 만들어진다
-~/.config/opencode/skills/opencode-setup-transfer/scripts/export.sh
+~/.config/opencode/skills/ai-setup-transfer/scripts/export.sh
 # 남에게 줄 때만
-~/.config/opencode/skills/opencode-setup-transfer/scripts/export.sh --mode share
+~/.config/opencode/skills/ai-setup-transfer/scripts/export.sh --mode share
 ```
 
-결과: `~/Desktop/opencode-setup-<모드>-<날짜>.tar.gz` (import.sh·connections.sh 동봉)
+결과: `~/Desktop/ai-setup-<모드>-<날짜>.tar.gz` (import.sh·connections.sh 동봉)
 
 ### 2) 가져오기 (새 컴퓨터)
 
 ```bash
-tar -xzf opencode-setup-personal-YYYYMMDD.tar.gz
-cd opencode-setup && ./import.sh
+tar -xzf ai-setup-personal-YYYYMMDD.tar.gz
+cd ai-setup && ./import.sh
 ```
 
 항목마다 y/N을 묻고, 기존 파일은 기본적으로 덮어쓰지 않습니다. 가져오기 전 상태는 `~/.config/opencode/backups/import-<시각>/` 에 백업됩니다. 마지막에 `opencode debug config` 로 설정이 실제로 읽히는지 검증하고, 연결 점검 결과와 남은 작업을 출력합니다.

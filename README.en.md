@@ -9,7 +9,7 @@ Supports **opencode, Claude Code, and codex**. It detects whichever are installe
 Got a new laptop? Work across a home and an office machine? You don't have to rebuild the skills and settings you've collected.
 
 ```
-[old machine]  export.sh  →  opencode-setup-personal-….tar.gz  →  [new machine]  import.sh
+[old machine]  export.sh  →  ai-setup-personal-….tar.gz  →  [new machine]  import.sh
 ```
 
 ---
@@ -19,10 +19,10 @@ Got a new laptop? Work across a home and an office machine? You don't have to re
 One line, on both machines.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/opencode-setup-transfer/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/ai-setup-transfer/main/install.sh | bash
 ```
 
-It installs to `~/.config/opencode/skills/opencode-setup-transfer/`.
+It installs to `~/.config/opencode/skills/ai-setup-transfer/`.
 
 On the new machine you can skip the install — the archive carries the tool with it, so `import.sh` is already there when you unpack.
 
@@ -31,10 +31,10 @@ On the new machine you can skip the install — the archive carries the tool wit
 ### 1. Export on the old machine
 
 ```bash
-~/.config/opencode/skills/opencode-setup-transfer/scripts/export.sh
+~/.config/opencode/skills/ai-setup-transfer/scripts/export.sh
 ```
 
-You get `opencode-setup-personal-<date>.tar.gz` on your Desktop. It's usually 1–5 MB, small enough to email yourself.
+You get `ai-setup-personal-<date>.tar.gz` on your Desktop. It's usually 1–5 MB, small enough to email yourself.
 
 ### 2. Import on the new machine
 
@@ -42,8 +42,8 @@ Move the file to the new machine's Downloads folder, then:
 
 ```bash
 cd ~/Downloads
-tar -xzf opencode-setup-personal-*.tar.gz
-cd opencode-setup && ./import.sh
+tar -xzf ai-setup-personal-*.tar.gz
+cd ai-setup && ./import.sh
 ```
 
 **It applies everything without asking.** Existing files are backed up first, then overwritten. Use `./import.sh --ask` if you want to confirm each category.
@@ -53,7 +53,7 @@ cd opencode-setup && ./import.sh
 A wizard walks you through one service at a time.
 
 ```bash
-~/.config/opencode/skills/opencode-setup-transfer/scripts/connect.sh wizard
+~/.config/opencode/skills/ai-setup-transfer/scripts/connect.sh wizard
 ```
 
 Supports **GitHub, Firebase, Vercel, Supabase, and Netlify**. For each service it:

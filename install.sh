@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# opencode 세팅 이사 도구 설치
+# AI 도구 세팅 이사 설치
 #
-#   curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/opencode-setup-transfer/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/ai-setup-transfer/main/install.sh | bash
 #
-# 하는 일: 이 저장소의 스킬을 opencode 설정 폴더에 넣고 실행 권한을 준다.
+# 하는 일: 이 저장소의 스킬을 설정 폴더에 넣고 실행 권한을 준다.
 set -euo pipefail
 
-REPO="${REPO:-Gospel-Lab/opencode-setup-transfer}"
+REPO="${REPO:-Gospel-Lab/ai-setup-transfer}"
 BRANCH="${BRANCH:-main}"
-NAME="opencode-setup-transfer"
+NAME="ai-setup-transfer"
 
 # 설정 폴더는 opencode 에게 묻는다. 없으면 표준 경로를 쓴다.
 CONF=""
@@ -18,7 +18,7 @@ fi
 CONF="${CONF:-$HOME/.config/opencode}"
 DEST="$CONF/skills/$NAME"
 
-echo "opencode 세팅 이사 도구를 설치합니다."
+echo "AI 도구 세팅 이사를 설치합니다."
 echo "  설치 위치: $DEST"
 
 TMP="$(mktemp -d)"
@@ -57,8 +57,8 @@ echo "▸ 지금 쓰던 컴퓨터에서 — 내 세팅을 파일 하나로 포�
 echo "    $DEST/scripts/export.sh"
 echo
 echo "▸ 새 컴퓨터에서 — 그 파일을 풀고 실행하면 자동 적용"
-echo "    tar -xzf opencode-setup-personal-*.tar.gz"
-echo "    cd opencode-setup && ./import.sh"
+echo "    tar -xzf ai-setup-personal-*.tar.gz"
+echo "    cd ai-setup && ./import.sh"
 echo
-echo "▸ 연결된 서비스 확인"
-echo "    $DEST/scripts/connections.sh setup"
+echo "▸ 깃허브·파이어베이스 같은 서비스 연결"
+echo "    $DEST/scripts/connect.sh wizard"

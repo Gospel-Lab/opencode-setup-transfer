@@ -11,22 +11,24 @@
 
 아카이브에 다음이 들어가는 경로는 **옵션으로도 열리지 않습니다.**
 
-| 대상 | 이유 |
-|---|---|
-| `~/.local/share/opencode/auth.json` | AI 제공자 API 키 |
-| `~/.local/share/opencode/opencode.db` | 전체 대화 기록 |
-| `~/.local/share/opencode/log/` | 로그 (프롬프트 내용이 남을 수 있음) |
-| `~/.config/gh/`, `~/.config/configstore/firebase-tools.json` | 서비스 자격증명 |
-| `~/.ssh/`, `~/.aws/`, `.env` 류 | 이 도구의 수집 대상이 아님 |
+담는 것을 목록으로 정해 두었기 때문에(화이트리스트), 아래 항목은 애초에 후보에 없습니다.
 
-`~/.config/opencode/opencode.json` 안의 제공자 키와 MCP 인증 헤더는
-`<<<REDACTED:…>>>` 자리표시자로 치환됩니다. 값은 담기지 않되, **어디를 채워야 하는지는 남습니다.**
+| 도구 | 담지 않는 것 | 이유 |
+|---|---|---|
+| opencode | `~/.local/share/opencode/` 전체 | `auth.json`(API 키), `opencode.db`(대화 기록), 로그 |
+| Claude Code | `~/.claude/projects/`, `history.jsonl`, `plugins/` 캐시 | 대화 기록·트랜스크립트, 수백 MB 캐시 |
+| codex | `~/.codex/auth.json`, `sessions/`, `logs*.sqlite`, `cache/` | API 키, 세션 기록(1GB 이상), 로그 |
+| 공통 | `~/.config/gh/`, `firebase-tools.json`, `~/.ssh/`, `~/.aws/`, `.env` 류 | 서비스 자격증명 — 수집 대상이 아님 |
+
+설정 파일 안의 제공자 키와 인증 헤더는 `<<<REDACTED:…>>>` 자리표시자로 치환됩니다.
+값은 담기지 않되, **어디를 채워야 하는지는 남습니다.** 주석이 있는 형식(`.jsonc`·`.toml`)은
+구조를 다시 쓰지 않고 값만 바꿔, 사용자가 적어둔 주석을 보존합니다.
 
 ## 두 겹 스캔 / Two-layer scan
 
 압축 직전에 페이로드 전체를 검사합니다.
 
-1. **키 형태 탐지** — `sk-…`, `sk-or-v1-…`, `ghp_…`, `github_pat_…`, `xox[abp]-…`, `AIza…`, PEM 개인키 블록, `api_key: "…"` 형태의 대입문
+1. **키 형태 탐지** — Anthropic(`sk-ant-`), OpenAI(`sk-proj-`·`sk-`), OpenRouter(`sk-or-v1-`), GitHub(`ghp_`·`github_pat_`), GitLab, Slack, Google(`AIza`·`ya29.`), AWS(`AKIA`·`ASIA`), JWT(`eyJ…`), DigitalOcean, Netlify, PEM 개인키 블록, 그리고 "비밀스러운 이름 = 긴 값" 형태의 대입문
 2. **본인 식별자 탐지** — 실행 시점에 `whoami`, `hostname`, `git config user.email/user.name` 으로 알아낸 값
 
 배포 모드(`--mode share`)에서 실제 설정 파일에 위 항목이 발견되면 **아카이브를 만들지 않고 중단**합니다.
@@ -64,18 +66,18 @@
 `curl … | bash` 는 편하지만 원격 코드를 즉시 실행합니다. 검토 후 실행하고 싶다면:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/opencode-setup-transfer/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/ai-setup-transfer/main/install.sh -o install.sh
 less install.sh          # 내용 확인
 bash install.sh
 ```
 
-저장소를 직접 clone 해 `skills/opencode-setup-transfer/` 폴더를
+저장소를 직접 clone 해 `skills/ai-setup-transfer/` 폴더를
 `~/.config/opencode/skills/` 로 복사해도 동일합니다.
 
 ## 취약점 제보 / Reporting a vulnerability
 
 키 유출 경로처럼 공개하기 곤란한 문제는 공개 이슈 대신
-[GitHub Security Advisory](https://github.com/Gospel-Lab/opencode-setup-transfer/security/advisories/new) 로 알려주세요.
+[GitHub Security Advisory](https://github.com/Gospel-Lab/ai-setup-transfer/security/advisories/new) 로 알려주세요.
 
 그 외 버그는 일반 이슈로 올려주시면 됩니다.
 
