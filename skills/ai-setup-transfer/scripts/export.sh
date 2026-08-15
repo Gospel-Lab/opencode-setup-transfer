@@ -278,7 +278,7 @@ python3 - "$PAY/opencode/opencode.json" <<'PYJ'
 import json, sys
 p = sys.argv[1]
 try:
-    cfg = json.load(open(p))
+    cfg = json.load(open(p, encoding='utf-8-sig'))
 except Exception as e:
     print("  ⚠️ opencode.json 파싱 실패:", e); raise SystemExit
 hit = []
@@ -316,7 +316,7 @@ for cfgfile in "$PAY/opencode/opencode.jsonc" "$PAY/codex/config.toml" "$PAY/cla
   python3 - "$cfgfile" <<'PYR'
 import re, sys, os
 p = sys.argv[1]
-t = open(p).read()
+t = open(p, encoding='utf-8-sig').read()
 hit = []
 def repl(m):
     hit.append(m.group("k"))
@@ -343,7 +343,7 @@ python3 - "$PAY/claude/settings.json" <<'PYC'
 import json, os, sys
 p = sys.argv[1]
 try:
-    d = json.load(open(p))
+    d = json.load(open(p, encoding='utf-8-sig'))
 except Exception:
     raise SystemExit
 lines = []

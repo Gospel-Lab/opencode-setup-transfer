@@ -126,8 +126,10 @@ merge_dir() { # src dst label
   fi
   if ask "  $label 을(를) 가져올까요?"; then
     if [ "$nconf" -gt 0 ] && ask "  기존 파일을 덮어쓸까요? (아니오 = 없는 것만 추가)"; then
-      mkdir -p "$BACKUP/$(basename "$dst")"
-      cp -R "$dst"/. "$BACKUP/$(basename "$dst")"/ 2>/dev/null || true
+      # 백업은 "도구/폴더" 구조로 남긴다. 도구마다 skills 폴더가 있어 이름만으로는 충돌한다.
+      bkdir="$BACKUP/${tool:-unknown}/$(basename "$dst")"
+      mkdir -p "$bkdir"
+      cp -R "$dst"/. "$bkdir"/ 2>/dev/null || true
       mkdir -p "$dst"; cp -R "$src"/. "$dst"/
       echo "  덮어쓰기 완료 (기존본 백업: $BACKUP)"
     else
@@ -207,7 +209,7 @@ for tool in $TOOLS; do
 import json, os, re, sys
 src, dst = sys.argv[1], sys.argv[2]
 def load(path):
-    raw = open(path).read()
+    raw = open(path, encoding='utf-8-sig').read()
     out, i, in_str, esc = [], 0, False, False
     while i < len(raw):
         c = raw[i]

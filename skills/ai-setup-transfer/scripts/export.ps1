@@ -19,6 +19,14 @@ function Bad($m)  { Write-Host $m -ForegroundColor Red }
 
 $HomeDir = if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }
 
+# PowerShell 5.1 의 -Encoding UTF8 은 BOM 을 붙인다.
+# BOM 이 붙은 JSON 은 다른 도구(파이썬 등)가 읽다가 실패하므로 항상 BOM 없이 쓴다.
+function Write-Utf8NoBom([string]$Path, [string]$Text) {
+  $enc = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($Path, $Text, $enc)
+}
+
+
 # ── 이 컴퓨터에 깔린 도구를 찾는다 ────────────────────────────────
 # 만든 사람 환경이 아니라 쓰는 사람 환경 기준이다.
 function Get-ToolDir([string]$Tool) {
@@ -154,7 +162,7 @@ if ($Found.Count -eq 0) {
   Remove-Item -LiteralPath $Work -Recurse -Force -ErrorAction SilentlyContinue
   exit 1
 }
-$Found -join ' ' | Set-Content -LiteralPath (Join-Path $Stage '.tools') -Encoding UTF8
+Write-Utf8NoBom (Join-Path $Stage '.tools') ($Found -join ' ')
 
 Say "== 2/6 설정 파일의 비밀값 제거"
 
@@ -191,7 +199,7 @@ if (Test-Path -LiteralPath $ocJson) {
         }
       }
     }
-    $cfg | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $ocJson -Encoding UTF8
+Write-Utf8NoBom $ocJson ((    $cfg | ConvertTo-Json -Depth 20 ) -join "`n")
     if ($hits.Count) { Say ("  opencode.json: 치환 " + (($hits | Sort-Object -Unique) -join ', ')) }
     else { Say "  opencode.json: 비밀값 없음" }
 
@@ -201,7 +209,7 @@ if (Test-Path -LiteralPath $ocJson) {
         $m = if ($pl -is [array]) { $pl[0] } else { $pl }
         if ($m -is [string] -and $m -notmatch '^(\.|file:)') { $lines += "opencode plugin $m" }
       }
-      if ($lines.Count) { $lines | Set-Content -LiteralPath (Join-Path $Pay 'opencode\PLUGINS.txt') -Encoding UTF8 }
+      if ($lines.Count) { Write-Utf8NoBom (Join-Path $Pay 'opencode\PLUGINS.txt') (($lines -join "`n") + "`n") }
     }
   } catch { Warn "  ⚠️ opencode.json 을 읽지 못했습니다: $_" }
 }
@@ -220,7 +228,7 @@ foreach ($rel in @('opencode\opencode.jsonc','codex\config.toml','claude\setting
     $m.Groups[1].Value + $m.Groups[2].Value + $m.Groups[3].Value + "<<<REDACTED:$($m.Groups[2].Value)>>>" + $m.Groups[5].Value
   })
   if ($hits.Count) {
-    Set-Content -LiteralPath $f -Value $t2 -Encoding UTF8
+    Write-Utf8NoBom $f $t2
     Say ("  " + (Split-Path $rel -Leaf) + ": 치환 " + (($hits | Sort-Object -Unique) -join ', '))
   } else {
     Say ("  " + (Split-Path $rel -Leaf) + ": 비밀값 없음")
@@ -246,7 +254,7 @@ if (Test-Path -LiteralPath $clSettings) {
       }
     }
     if ($lines.Count) {
-      $lines | Set-Content -LiteralPath (Join-Path $Pay 'claude\PLUGINS.txt') -Encoding UTF8
+      Write-Utf8NoBom (Join-Path $Pay 'claude\PLUGINS.txt') (($lines -join "`n") + "`n")
       Say "  Claude Code 플러그인 $($lines.Count)개 목록 기록"
     }
   } catch { }
@@ -257,7 +265,7 @@ $connPs = Join-Path $PSScriptRoot 'connect.ps1'
 if (Test-Path -LiteralPath $connPs) {
   try {
     $rep = & $connPs -Mode report -Masked:($Mode -eq 'share') 6>$null
-    $rep | Set-Content -LiteralPath (Join-Path $Stage 'CONNECTIONS.md') -Encoding UTF8
+    Write-Utf8NoBom (Join-Path $Stage 'CONNECTIONS.md') (($rep -join "`n") + "`n")
     Say "  기록 완료 (토큰은 담기지 않습니다)"
   } catch { Warn "  연결 목록을 만들지 못했습니다: $_" }
 }
@@ -273,7 +281,7 @@ Get-ChildItem -LiteralPath $Pay -Recurse -File -Force -ErrorAction SilentlyConti
         $c = $c.Replace($HomeDir, '{{HOME}}')
         # 슬래시 방향이 다른 표기도 함께 바꾼다
         $c = $c.Replace($HomeDir.Replace('\','/'), '{{HOME}}')
-        Set-Content -LiteralPath $_.FullName -Value $c -Encoding UTF8
+        Write-Utf8NoBom $_.FullName $c
       }
     } catch { }
   }
@@ -376,7 +384,7 @@ if ($SymNotes.Count) {
   $man += "## 크기 때문에 제외한 항목"
   $man += $SymNotes
 }
-$man | Set-Content -LiteralPath (Join-Path $Stage 'MANIFEST.md') -Encoding UTF8
+Write-Utf8NoBom (Join-Path $Stage 'MANIFEST.md') (($man -join "`n") + "`n")
 
 # 반대편에서 쓸 스크립트를 함께 담는다 — 새 컴퓨터에 아무것도 없어도 되도록
 foreach ($f in @('import.ps1','connect.ps1','import.sh','connections.sh','connect.sh')) {

@@ -19,6 +19,14 @@ function OK($m)   { Write-Host $m -ForegroundColor Green }
 
 $HomeDir = if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }
 
+# PowerShell 5.1 의 -Encoding UTF8 은 BOM 을 붙인다.
+# BOM 이 붙은 JSON 은 다른 도구(파이썬 등)가 읽다가 실패하므로 항상 BOM 없이 쓴다.
+function Write-Utf8NoBom([string]$Path, [string]$Text) {
+  $enc = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($Path, $Text, $enc)
+}
+
+
 function Get-DestDir([string]$Tool) {
   if ($ConfigDir -and $Tool -eq 'opencode') { return $ConfigDir }
   switch ($Tool) {
@@ -91,7 +99,7 @@ Get-ChildItem -LiteralPath $Work -Recurse -File -Force -ErrorAction SilentlyCont
     try {
       $c = Get-Content -LiteralPath $_.FullName -Raw -ErrorAction Stop
       if ($c -and $c.Contains('{{HOME}}')) {
-        Set-Content -LiteralPath $_.FullName -Value $c.Replace('{{HOME}}', $HomeDir) -Encoding UTF8
+        Write-Utf8NoBom $_.FullName $c.Replace('{{HOME}}', $HomeDir)
       }
     } catch { }
   }
@@ -148,7 +156,9 @@ function Merge-Folder([string]$SrcDir, [string]$DstDir, [string]$Label, [string]
   if ($conflicts.Count -and $Ask) { $overwrite = Confirm-Step "  기존 파일을 덮어쓸까요? (아니오 = 없는 것만 추가)" }
 
   if ($conflicts.Count -and $overwrite) {
-    $bk = Join-Path $Backup $Tool
+    # 백업은 "도구/폴더/파일" 구조로 남긴다. 폴더 이름을 빼면 어디로 되돌릴지 알 수 없고,
+    # 도구마다 skills 폴더가 있어 이름만으로는 서로 덮어쓴다.
+    $bk = Join-Path (Join-Path $Backup $Tool) (Split-Path $DstDir -Leaf)
     New-Item -ItemType Directory -Force -Path $bk | Out-Null
     foreach ($rel in $conflicts) {
       $t = Join-Path $DstDir $rel
@@ -214,7 +224,7 @@ function Merge-JsonConfig([string]$SrcFile, [string]$DstFile) {
     if ($curText.Trim()) { $cur = ToHash ($curText | ConvertFrom-Json) }
   }
   $merged = DeepMerge $cur $new
-  $merged | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $DstFile -Encoding UTF8
+Write-Utf8NoBom $DstFile ((  $merged | ConvertTo-Json -Depth 20 ) -join "`n")
   Say "  병합 완료 (기존본은 백업에 있습니다)"
 }
 
