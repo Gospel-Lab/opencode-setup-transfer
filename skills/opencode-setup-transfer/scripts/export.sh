@@ -135,7 +135,21 @@ copy_dir() { # src dst
     --exclude '.DS_Store' --exclude '__pycache__/' --exclude '.pytest_cache/' \
     --exclude 'venv/' --exclude '.venv/' --exclude 'dist/' --exclude 'build/' \
     --exclude '.next/' --exclude 'coverage/' --exclude '*.pyc' \
-    "$1"/ "$2"/ 2>/dev/null || cp -RL "$1"/. "$2"/ 2>/dev/null || true
+    "$1"/ "$2"/ 2>/dev/null && return 0
+
+  # rsync 가 없는 시스템(WSL 최소 설치 등)을 위한 폴백.
+  # cp -RL 로 하면 제외 규칙이 통째로 무시돼 node_modules 와 대형 링크가 딸려 들어간다.
+  # tar 는 어느 시스템에나 있고 -h(링크 실체화)와 -X(제외 목록)를 모두 지원한다.
+  ( cd "$1" && tar -chf - -X "$EXCLUDE_FILE" \
+      --exclude '.git' --exclude 'node_modules' --exclude '*.log' \
+      --exclude '.DS_Store' --exclude '__pycache__' --exclude '.pytest_cache' \
+      --exclude 'venv' --exclude '.venv' --exclude 'dist' --exclude 'build' \
+      --exclude '.next' --exclude 'coverage' --exclude '*.pyc' \
+      . 2>/dev/null ) | ( cd "$2" && tar -xf - 2>/dev/null ) && return 0
+
+  # 그마저 안 되면 통째 복사라도 한다. 다만 제외가 적용되지 않았음을 알린다.
+  cp -RL "$1"/. "$2"/ 2>/dev/null || true
+  echo "  ⚠️ rsync·tar 를 쓸 수 없어 제외 규칙 없이 복사했습니다: $1" >&2
 }
 
 # opencode 는 단수/복수 디렉터리명을 모두 인정한다
@@ -232,9 +246,29 @@ echo "== 5/6 비밀정보·개인정보 스캔"
 SCAN="$(dirname "$STAGE")/secret-scan.txt"
 RAW="$(dirname "$STAGE")/.raw.txt"
 : > "$SCAN"; : > "$RAW"
-PATTERN='(sk-[A-Za-z0-9]{16,}|sk-or-v1-[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abp]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|"?(api[_-]?key|access[_-]?token|client[_-]?secret)"?[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"']{12,})'
+# 실제로 쓰이는 키 형식들. 하나라도 빠지면 그 키는 그대로 새어 나간다.
+# 접두어가 있는 것은 접두어로, 없는 것은 "이름 = 긴 값" 형태로 잡는다.
+PATTERN='('
+PATTERN="$PATTERN"'sk-ant-[A-Za-z0-9_-]{20,}'                    # Anthropic
+PATTERN="$PATTERN"'|sk-proj-[A-Za-z0-9_-]{20,}'                  # OpenAI (신형)
+PATTERN="$PATTERN"'|sk-or-v1-[A-Za-z0-9_-]{16,}'                 # OpenRouter
+PATTERN="$PATTERN"'|sk-[A-Za-z0-9]{20,}'                         # OpenAI (구형) 등
+PATTERN="$PATTERN"'|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}'   # GitHub
+PATTERN="$PATTERN"'|github_pat_[A-Za-z0-9_]{20,}'
+PATTERN="$PATTERN"'|glpat-[A-Za-z0-9_-]{16,}'                    # GitLab
+PATTERN="$PATTERN"'|xox[abprs]-[A-Za-z0-9-]{10,}'                # Slack
+PATTERN="$PATTERN"'|AIza[0-9A-Za-z_-]{30,}'                      # Google
+PATTERN="$PATTERN"'|ya29\.[0-9A-Za-z_-]{20,}'                    # Google OAuth
+PATTERN="$PATTERN"'|(AKIA|ASIA)[0-9A-Z]{16}'                     # AWS 접근키
+PATTERN="$PATTERN"'|dop_v1_[a-f0-9]{32,}'                        # DigitalOcean
+PATTERN="$PATTERN"'|nfp_[A-Za-z0-9]{20,}'                        # Netlify
+PATTERN="$PATTERN"'|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{3,}'  # JWT (Supabase 등)
+PATTERN="$PATTERN"'|-----BEGIN [A-Z ]*PRIVATE KEY-----'          # 개인키
+# 접두어 없는 값: 따옴표가 있든 없든 "비밀스러운 이름 = 긴 값" 을 잡는다
+PATTERN="$PATTERN"'|[A-Za-z_]*(api[_-]?key|secret|token|password|passwd|credential)[A-Za-z_]*["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9/+_-]{16,}'
+PATTERN="$PATTERN"')'
 FIXTURE='(/tests?/|/__tests__/|/fixtures?/|/site-packages/|/node_modules/|/examples?/|\.test\.|\.spec\.)'
-grep -rIn -E "$PATTERN" "$PAY" 2>/dev/null | grep -v 'REDACTED' > "$RAW" || true
+grep -rIn -iE "$PATTERN" "$PAY" 2>/dev/null | grep -v 'REDACTED' > "$RAW" || true
 grep -v -E "$FIXTURE" "$RAW" > "$SCAN" || true
 INFO="$(grep -c -E "$FIXTURE" "$RAW" || true)"
 HITS=$(grep -c . "$SCAN" || true)
