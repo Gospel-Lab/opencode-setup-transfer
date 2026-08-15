@@ -18,6 +18,14 @@ Got a new laptop? Work across a home and an office machine? You don't have to re
 
 One line, on both machines.
 
+**Windows** (PowerShell, no admin rights needed):
+
+```powershell
+irm https://raw.githubusercontent.com/Gospel-Lab/ai-setup-transfer/main/install.ps1 | iex
+```
+
+**macOS / Linux / WSL:**
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/ai-setup-transfer/main/install.sh | bash
 ```
@@ -174,9 +182,12 @@ export.sh --mode share --exclude my-private-script.sh
 
 ## Requirements
 
-- macOS, Linux, or WSL (on Windows, WSL is the path opencode itself recommends)
-- `bash`, `tar`, `rsync`, `python3`, `perl` — present on most systems
-- [opencode](https://opencode.ai)
+**Windows** — nothing to install. Windows 10 1809+ ships both PowerShell and `tar`.
+No WSL, Git Bash, or Python required.
+
+**macOS / Linux** — `bash`, `tar`, `python3` (preinstalled); `rsync` optional (falls back to `tar`).
+
+**Either** — at least one of [opencode](https://opencode.ai), [Claude Code](https://claude.com/claude-code), or [codex](https://developers.openai.com/codex/cli).
 
 ## License
 

@@ -18,6 +18,14 @@
 
 두 컴퓨터 모두에서 한 줄이면 됩니다.
 
+**윈도우** — PowerShell 을 열고(관리자 권한 필요 없음):
+
+```powershell
+irm https://raw.githubusercontent.com/Gospel-Lab/ai-setup-transfer/main/install.ps1 | iex
+```
+
+**맥 · 리눅스 · WSL**:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/ai-setup-transfer/main/install.sh | bash
 ```
@@ -29,6 +37,14 @@ curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/ai-setup-transfer/main/i
 
 ### 1. 옛 컴퓨터에서 내보내기
 
+**윈도우:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.config\opencode\skills\ai-setup-transfer\scripts\export.ps1"
+```
+
+**맥 · 리눅스:**
+
 ```bash
 ~/.config/opencode/skills/ai-setup-transfer/scripts/export.sh
 ```
@@ -38,6 +54,17 @@ curl -fsSL https://raw.githubusercontent.com/Gospel-Lab/ai-setup-transfer/main/i
 ### 2. 새 컴퓨터에서 가져오기
 
 파일을 새 컴퓨터의 다운로드 폴더에 옮긴 뒤:
+
+**윈도우:**
+
+```powershell
+cd $env:USERPROFILE\Downloads
+tar -xzf ai-setup-personal-*.tar.gz
+cd ai-setup
+powershell -ExecutionPolicy Bypass -File import.ps1
+```
+
+**맥 · 리눅스:**
 
 ```bash
 cd ~/Downloads
@@ -51,6 +78,14 @@ cd ai-setup && ./import.sh
 ### 3. 서비스 다시 로그인 — 연결 도우미
 
 터미널이 낯설어도 괜찮습니다. 마법사가 **한 서비스씩 손을 잡고** 갑니다.
+
+**윈도우:**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.config\opencode\skills\ai-setup-transfer\scripts\connect.ps1" -Mode wizard
+```
+
+**맥 · 리눅스:**
 
 ```bash
 ~/.config/opencode/skills/ai-setup-transfer/scripts/connect.sh wizard
@@ -178,9 +213,15 @@ export.sh --mode share --exclude my-private-script.sh
 
 ## 요구사항
 
-- macOS, Linux, 또는 WSL (Windows 는 WSL 권장 — opencode 공식 권장 방식입니다)
-- `bash`, `tar`, `rsync`, `python3` (대부분 기본 설치돼 있습니다)
-- [opencode](https://opencode.ai)
+**윈도우** — 추가 설치가 필요 없습니다.
+- Windows 10 1809 이상 (PowerShell 과 `tar` 가 기본 포함돼 있습니다)
+- WSL·Git Bash·Python 모두 필요 없습니다
+
+**맥 · 리눅스**
+- `bash`, `tar`, `python3` (기본 포함), `rsync` (없으면 `tar` 로 대체합니다)
+
+**공통** — 옮길 AI 도구가 하나라도 설치돼 있으면 됩니다:
+[opencode](https://opencode.ai) · [Claude Code](https://claude.com/claude-code) · [codex](https://developers.openai.com/codex/cli)
 
 ## 라이선스
 
