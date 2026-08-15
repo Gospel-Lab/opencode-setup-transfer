@@ -6,17 +6,26 @@ set -euo pipefail
 # 있더라도 백업 후 덮어쓰므로 되돌릴 수 있다. --ask 로 항목별 확인 모드.
 YES=1
 SRC=""
-# 설정 폴더는 opencode 자신에게 묻는다 (OPENCODE_CONFIG_DIR 을 덮어쓰는 실행 환경이 있다)
-resolve_conf() {
-  local p=""
-  if command -v opencode >/dev/null 2>&1; then
-    p="$(opencode debug paths 2>/dev/null | awk '$1=="config"{ $1=""; sub(/^ +/,""); print; exit }')"
-  fi
-  [ -n "$p" ] && { printf '%s' "$p"; return; }
-  printf '%s' "$HOME/.config/opencode"
+# 각 도구의 설정 폴더는 이 컴퓨터를 기준으로 정한다.
+# 도구가 아직 안 깔려 있어도 설정을 미리 넣어둘 수 있도록, 없으면 표준 경로를 쓴다.
+dest_dir() {
+  case "$1" in
+    opencode)
+      local p=""
+      if command -v opencode >/dev/null 2>&1; then
+        p="$(opencode debug paths </dev/null 2>/dev/null | awk '$1=="config"{ $1=""; sub(/^ +/,""); print; exit }')" || p=""
+      fi
+      printf '%s' "${p:-$HOME/.config/opencode}" ;;
+    claude) printf '%s' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" ;;
+    codex)  printf '%s' "${CODEX_HOME:-$HOME/.codex}" ;;
+  esac
 }
-CONF="$(resolve_conf)"
-CLAUDE_SKILLS="$HOME/.claude/skills"
+tool_label() {
+  case "$1" in
+    opencode) echo "opencode" ;; claude) echo "Claude Code" ;; codex) echo "codex" ;;
+  esac
+}
+CONF="$(dest_dir opencode)"
 
 usage() {
   cat <<'EOF'
@@ -132,83 +141,71 @@ merge_dir() { # src dst label
   fi
 }
 
-for d in agent agents command commands skill skills theme themes mode modes plugin plugins; do
-  merge_dir "$WORK/$d" "$CONF/$d" "$d/"
-done
-
-# opencode 가 자동으로 읽는 외부 스킬
-merge_dir "$WORK/external-claude-skills" "$CLAUDE_SKILLS" "외부 스킬 (~/.claude/skills)"
-
-if [ -f "$WORK/AGENTS.md" ]; then
-  echo
-  echo "--- 전역 지침 (AGENTS.md)"
-  [ -f "$CONF/AGENTS.md" ] && echo "  기존 AGENTS.md 가 있습니다. 덮어쓰면 사라집니다(백업은 남습니다)."
-  if ask "  가져올까요?"; then
-    [ -f "$CONF/AGENTS.md" ] && cp "$CONF/AGENTS.md" "$BACKUP/AGENTS.md"
-    cp "$WORK/AGENTS.md" "$CONF/AGENTS.md"; echo "  완료"
-  fi
+# ── 아카이브에 담긴 도구를 하나씩 적용한다 ────────────────────────
+TOOLS=""
+[ -f "$SRC/.tools" ] && TOOLS="$(cat "$SRC/.tools")"
+if [ -z "$TOOLS" ]; then
+  # 옛 형식(도구 폴더 없이 opencode 파일이 최상위)도 받아들인다
+  for t in opencode claude codex; do [ -d "$WORK/$t" ] && TOOLS="$TOOLS $t"; done
+  [ -z "$TOOLS" ] && [ -d "$WORK/skills" ] && { mkdir -p "$WORK/opencode"; mv "$WORK"/* "$WORK/opencode/" 2>/dev/null; TOOLS="opencode"; }
+  [ -d "$WORK/external-claude-skills" ] && { mkdir -p "$WORK/claude"; mv "$WORK/external-claude-skills" "$WORK/claude/skills" 2>/dev/null; TOOLS="$TOOLS claude"; }
 fi
 
-# 플러그인 의존성(package.json)을 병합한다.
-# opencode 는 시작할 때 여기 적힌 모듈을 스스로 설치하므로, 이 파일만 맞으면 플러그인이 자동 복원된다.
-if [ -f "$WORK/package.json" ]; then
+APPLIED=""
+for tool in $TOOLS; do
+  TW="$WORK/$tool"
+  [ -d "$TW" ] || continue
+  DEST="$(dest_dir "$tool")"
+  mkdir -p "$DEST"
   echo
-  echo "--- 플러그인 의존성 (package.json)"
-  if ask "  병합할까요?"; then
-    [ -f "$CONF/package.json" ] && cp "$CONF/package.json" "$BACKUP/package.json"
-    python3 - "$WORK/package.json" "$CONF/package.json" <<'PYP'
-import json, os, sys
-src, dst = sys.argv[1], sys.argv[2]
-new = json.load(open(src))
-cur = json.load(open(dst)) if os.path.exists(dst) else {}
-deps = dict(cur.get("dependencies") or {})
-added = []
-for k, v in (new.get("dependencies") or {}).items():
-    if k not in deps:
-        deps[k] = v
-        added.append(k)
-cur["dependencies"] = deps
-json.dump(cur, open(dst, "w"), indent=2)
-if added:
-    print("  추가된 플러그인 %d개: %s" % (len(added), ", ".join(added)))
-    print("  → opencode 를 다시 실행하면 자동으로 설치됩니다.")
-else:
-    print("  새로 추가할 플러그인 없음")
-PYP
-  fi
-fi
+  echo "═══ $(tool_label "$tool") → $DEST"
 
-# 설정 파일은 opencode.json 과 opencode.jsonc 두 형식이 모두 쓰인다.
-# .jsonc 를 빠뜨리면 그 사용자의 설정이 통째로 적용되지 않은 채 조용히 사라진다.
-SRC_CFG=""
-for cand in opencode.jsonc opencode.json; do
-  [ -f "$WORK/$cand" ] && { SRC_CFG="$cand"; break; }
-done
-
-if [ -n "$SRC_CFG" ]; then
-  # 대상 파일은 이 컴퓨터에 이미 있는 형식을 따른다. 없으면 가져온 형식을 그대로 쓴다.
-  DST_CFG=""
-  for cand in opencode.jsonc opencode.json; do
-    [ -f "$CONF/$cand" ] && { DST_CFG="$cand"; break; }
-  done
-  DST_CFG="${DST_CFG:-$SRC_CFG}"
-
-  echo
-  echo "--- 설정 파일 ($SRC_CFG → $DST_CFG)"
-  if ask "  적용할까요?"; then
-    if [ ! -f "$CONF/$DST_CFG" ]; then
-      # 대상이 비어 있으면 그대로 복사한다. 주석까지 살아남는다.
-      cp "$WORK/$SRC_CFG" "$CONF/$DST_CFG"
-      echo "  복사 완료"
-      grep -o '<<<REDACTED:[^>]*>>>' "$CONF/$DST_CFG" 2>/dev/null | sed 's/<<<REDACTED:/    직접 채워야 함: /; s/>>>//' | sort -u
+  for entry in "$TW"/*; do
+    [ -e "$entry" ] || continue
+    name="$(basename "$entry")"
+    case "$name" in
+      PLUGINS.txt) continue ;;                       # 안내용 파일
+      opencode.json|opencode.jsonc|settings.json|config.toml) continue ;;  # 설정은 아래서 따로
+    esac
+    if [ -d "$entry" ]; then
+      merge_dir "$entry" "$DEST/$name" "$name/"
     else
-      cp "$CONF/$DST_CFG" "$BACKUP/$DST_CFG"
-      python3 - "$WORK/$SRC_CFG" "$CONF/$DST_CFG" <<'PYCFG'
+      if [ -e "$DEST/$name" ]; then
+        echo
+        echo "--- $name (이미 있음)"
+        if ask "  덮어쓸까요? (기존본은 백업됩니다)"; then
+          mkdir -p "$BACKUP/$tool"; cp "$DEST/$name" "$BACKUP/$tool/$name" 2>/dev/null || true
+          cp "$entry" "$DEST/$name"; echo "  덮어썼습니다"
+        else
+          echo "  건너뜀"
+        fi
+      else
+        cp "$entry" "$DEST/$name"
+        echo
+        echo "--- $name  복사 완료"
+      fi
+    fi
+  done
+
+  # 설정 파일 — 형식마다 다루는 법이 다르다
+  apply_config() { # 원본파일 대상파일 병합가능여부
+    local src="$1" dst="$2" mergeable="$3"
+    [ -f "$src" ] || return 0
+    echo
+    echo "--- $(basename "$dst")"
+    if [ ! -f "$dst" ]; then
+      cp "$src" "$dst"
+      echo "  복사 완료 (주석까지 그대로)"
+      grep -o '<<<REDACTED:[^>]*>>>' "$dst" 2>/dev/null | sed 's/<<<REDACTED:/    직접 채워야 함: /; s/>>>//' | sort -u
+      return 0
+    fi
+    mkdir -p "$BACKUP/$tool"; cp "$dst" "$BACKUP/$tool/$(basename "$dst")"
+    if [ "$mergeable" = "json" ]; then
+      ask "  기존 설정과 병합할까요?" || { echo "  건너뜀"; return 0; }
+      python3 - "$src" "$dst" <<'PYCFG'
 import json, os, re, sys
 src, dst = sys.argv[1], sys.argv[2]
-
 def load(path):
-    """주석이 있는 jsonc 도 읽는다. 문자열 안의 // 는 건드리지 않는다."""
     raw = open(path).read()
     out, i, in_str, esc = [], 0, False, False
     while i < len(raw):
@@ -219,34 +216,24 @@ def load(path):
             elif c == "\\": esc = True
             elif c == '"': in_str = False
             i += 1; continue
-        if c == '"':
-            in_str = True; out.append(c); i += 1; continue
+        if c == '"': in_str = True; out.append(c); i += 1; continue
         if c == '/' and i + 1 < len(raw):
             if raw[i+1] == '/':
                 while i < len(raw) and raw[i] != '\n': i += 1
                 continue
             if raw[i+1] == '*':
-                j = raw.find('*/', i + 2)
-                i = len(raw) if j < 0 else j + 2
-                continue
+                j = raw.find('*/', i + 2); i = len(raw) if j < 0 else j + 2; continue
         out.append(c); i += 1
-    text = re.sub(r',(\s*[}\]])', r'\1', ''.join(out))   # 후행 쉼표 제거
+    text = re.sub(r',(\s*[}\]])', r'\1', ''.join(out))
     return json.loads(text) if text.strip() else {}
-
-new = load(src)
-cur = load(dst) if os.path.exists(dst) else {}
-
+new = load(src); cur = load(dst) if os.path.exists(dst) else {}
 def deep(a, b):
     out = dict(a)
     for k, v in b.items():
-        if isinstance(v, dict) and isinstance(out.get(k), dict):
-            out[k] = deep(out[k], v)
-        elif isinstance(v, list) and isinstance(out.get(k), list):
-            out[k] = out[k] + [x for x in v if x not in out[k]]
-        else:
-            out[k] = v
+        if isinstance(v, dict) and isinstance(out.get(k), dict): out[k] = deep(out[k], v)
+        elif isinstance(v, list) and isinstance(out.get(k), list): out[k] = out[k] + [x for x in v if x not in out[k]]
+        else: out[k] = v
     return out
-
 merged = deep(cur, new)
 red = []
 def walk(o, p=""):
@@ -254,31 +241,64 @@ def walk(o, p=""):
         for k, v in o.items(): walk(v, p + "." + k)
     elif isinstance(o, list):
         for i, v in enumerate(o): walk(v, "%s[%d]" % (p, i))
-    elif isinstance(o, str) and o.startswith("<<<REDACTED:"):
-        red.append(p.lstrip("."))
+    elif isinstance(o, str) and o.startswith("<<<REDACTED:"): red.append(p.lstrip("."))
 walk(merged)
 json.dump(merged, open(dst, "w"), indent=2, ensure_ascii=False)
-print("  병합 완료 (기존 파일은 백업에 있습니다 — 주석이 있었다면 거기서 확인하세요)")
-for r in red:
-    print("    직접 채워야 함:", r)
+print("  병합 완료 (기존본은 백업에 있습니다)")
+for r in red: print("    직접 채워야 함:", r)
 PYCFG
+    else
+      # TOML 은 안전한 자동 병합이 어렵다. 덮어쓰지 않고 나란히 둔다.
+      cp "$src" "$dst.from-old-machine"
+      echo "  이 컴퓨터에 이미 설정이 있어 덮어쓰지 않았습니다."
+      echo "  옛 설정은 $(basename "$dst").from-old-machine 로 저장했습니다. 필요한 줄만 옮겨 쓰세요."
     fi
-  fi
-fi
+  }
+
+  case "$tool" in
+    opencode)
+      SRC_CFG=""
+      for cand in opencode.jsonc opencode.json; do [ -f "$TW/$cand" ] && { SRC_CFG="$cand"; break; }; done
+      if [ -n "$SRC_CFG" ]; then
+        DST_CFG=""
+        for cand in opencode.jsonc opencode.json; do [ -f "$DEST/$cand" ] && { DST_CFG="$cand"; break; }; done
+        apply_config "$TW/$SRC_CFG" "$DEST/${DST_CFG:-$SRC_CFG}" json
+      fi ;;
+    claude) apply_config "$TW/settings.json" "$DEST/settings.json" json ;;
+    codex)  apply_config "$TW/config.toml"  "$DEST/config.toml"  toml ;;
+  esac
+
+  APPLIED="$APPLIED $tool"
+done
 
 echo
-echo "== opencode 설정 검증"
-if command -v opencode >/dev/null 2>&1; then
-  if tmo 20 opencode debug config >/dev/null 2>&1; then
-    echo "  설정이 정상적으로 읽힙니다."
-    echo "  인식된 스킬: $(tmo 20 opencode debug skill 2>/dev/null | grep -c '"name"' || echo '확인 불가')개"
-  else
-    echo "  ⚠️ opencode 가 설정을 읽지 못했습니다. 아래로 원인을 확인하세요:"
-    echo "     opencode debug config"
-  fi
-else
-  echo "  opencode 가 아직 설치되지 않았습니다."
-fi
+echo "== 적용 결과 확인"
+for tool in $APPLIED; do
+  case "$tool" in
+    opencode)
+      if command -v opencode >/dev/null 2>&1; then
+        if tmo 20 opencode debug config </dev/null >/dev/null 2>&1; then
+          echo "  opencode: 설정 정상 · 스킬 $(tmo 20 opencode debug skill </dev/null 2>/dev/null | grep -c '"name"' || echo '?')개 인식"
+        else
+          echo "  ⚠️ opencode: 설정을 읽지 못했습니다 → opencode debug config 로 확인하세요"
+        fi
+      else
+        echo "  opencode: 아직 설치되지 않음 (설정만 넣어두었습니다)"
+      fi ;;
+    claude)
+      if command -v claude >/dev/null 2>&1; then
+        echo "  Claude Code: 설치됨 · 스킬 $(ls "$(dest_dir claude)/skills" 2>/dev/null | wc -l | tr -d ' ')개"
+      else
+        echo "  Claude Code: 아직 설치되지 않음 (설정만 넣어두었습니다)"
+      fi ;;
+    codex)
+      if command -v codex >/dev/null 2>&1; then
+        echo "  codex: 설치됨 · 스킬 $(ls "$(dest_dir codex)/skills" 2>/dev/null | wc -l | tr -d ' ')개"
+      else
+        echo "  codex: 아직 설치되지 않음 (설정만 넣어두었습니다)"
+      fi ;;
+  esac
+done
 
 echo
 if [ -f "$SRC/CONNECTIONS.md" ]; then
@@ -304,10 +324,20 @@ fi
 
 echo
 echo "==================== 남은 작업 ===================="
-echo "1. opencode auth login  — AI 제공자에 본인 API 키로 연결"
-[ -f "$WORK/PLUGINS.md" ] && { echo "2. 플러그인 설치:"; sed 's/^/     /' "$WORK/PLUGINS.md"; }
-echo "3. 설정 파일의 <<<REDACTED:...>>> 값 직접 채우기"
-echo "4. 위 「아직 해야 할 것」의 로그인 명령 실행"
-echo "5. opencode 를 종료했다가 다시 실행 (설정은 시작할 때 한 번만 읽습니다)"
+N=1
+for tool in $APPLIED; do
+  case "$tool" in
+    opencode)
+      echo "$N. opencode auth login  — AI 제공자에 본인 키로 연결"; N=$((N+1))
+      [ -f "$WORK/opencode/PLUGINS.txt" ] && { echo "$N. opencode 플러그인 설치:"; sed 's/^/     /' "$WORK/opencode/PLUGINS.txt"; N=$((N+1)); } ;;
+    claude)
+      [ -f "$WORK/claude/PLUGINS.txt" ] && { echo "$N. Claude Code 플러그인 설치:"; sed 's/^/     /' "$WORK/claude/PLUGINS.txt"; N=$((N+1)); } ;;
+    codex)
+      echo "$N. codex 로그인 (codex 실행 후 안내를 따르세요)"; N=$((N+1)) ;;
+  esac
+done
+echo "$N. 설정 파일의 <<<REDACTED:...>>> 값 직접 채우기"; N=$((N+1))
+echo "$N. 위 「아직 해야 할 것」의 서비스 로그인"; N=$((N+1))
+echo "$N. 각 도구를 종료했다가 다시 실행 (설정은 시작할 때 한 번만 읽습니다)"
 echo
 echo "가져오기 전 상태 백업: $BACKUP"

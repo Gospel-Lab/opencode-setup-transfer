@@ -1,8 +1,10 @@
-# opencode Setup Transfer
+# AI Setup Transfer
 
 *[한국어 문서](README.md)*
 
-Pack your opencode setup into a single file on one computer, and unpack it automatically on another.
+Pack your AI tool setup into a single file on one computer, and unpack it automatically on another.
+
+Supports **opencode, Claude Code, and codex**. It detects whichever are installed on the machine it runs on and packs only those.
 
 Got a new laptop? Work across a home and an office machine? You don't have to rebuild the skills and settings you've collected.
 

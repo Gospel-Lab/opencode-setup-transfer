@@ -29,7 +29,7 @@ tmo() { # 초 명령...
 resolve_conf() {
   local p=""
   if command -v opencode >/dev/null 2>&1; then
-    p="$(tmo 15 opencode debug paths 2>/dev/null | awk '$1=="config"{ $1=""; sub(/^ +/,""); print; exit }')"
+    p="$(tmo 15 opencode debug paths </dev/null 2>/dev/null | awk '$1=="config"{ $1=""; sub(/^ +/,""); print; exit }')" || p=""
   fi
   [ -n "$p" ] && [ -d "$p" ] && { printf '%s' "$p"; return; }
   printf '%s' "$HOME/.config/opencode"
@@ -101,8 +101,68 @@ EXCLUDE_FILE="$(dirname "$STAGE")/excludes.txt"
 : > "$EXCLUDE_FILE"
 printf '%s\n' "$USER_EXCLUDES" | grep -v '^$' >> "$EXCLUDE_FILE" || true
 
+
+# ────────────────────────────────────────────────────────────────
+# 이 컴퓨터에 어떤 AI 도구가 깔려 있는지 실행할 때마다 찾아낸다.
+# 만든 사람의 환경을 기준으로 삼지 않는다 — 쓰는 사람마다 다르다.
+# 없는 도구는 조용히 건너뛴다.
+# ────────────────────────────────────────────────────────────────
+
+tool_dir() { # 도구 → 설정 폴더 경로 (없으면 빈 문자열)
+  case "$1" in
+    opencode)
+      local p=""
+      if command -v opencode >/dev/null 2>&1; then
+        p="$(tmo 15 opencode debug paths </dev/null 2>/dev/null | awk '$1=="config"{ $1=""; sub(/^ +/,""); print; exit }')" || p=""
+      fi
+      [ -n "$p" ] && [ -d "$p" ] && { printf '%s' "$p"; return; }
+      [ -d "$HOME/.config/opencode" ] && printf '%s' "$HOME/.config/opencode"
+      ;;
+    claude)
+      local p="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+      [ -d "$p" ] && printf '%s' "$p"
+      ;;
+    codex)
+      local p="${CODEX_HOME:-$HOME/.codex}"
+      [ -d "$p" ] && printf '%s' "$p"
+      ;;
+  esac
+  # set -e 아래에서는 함수의 마지막 판정이 실패로 끝나면 호출한 쪽이 통째로 죽는다.
+  # "없음"은 오류가 아니라 정상적인 결과이므로 항상 성공으로 끝낸다.
+  return 0
+}
+
+tool_label() {
+  case "$1" in
+    opencode) echo "opencode" ;;
+    claude)   echo "Claude Code" ;;
+    codex)    echo "codex" ;;
+  esac
+}
+
+# 도구별로 담을 것. 여기 적힌 것만 담긴다(화이트리스트).
+# 대화 기록·로그·캐시·인증 파일은 애초에 후보에 없다.
+tool_items() {
+  case "$1" in
+    opencode) echo "opencode.json opencode.jsonc tui.json package.json AGENTS.md
+                    agent agents command commands skill skills theme themes mode modes plugin plugins" ;;
+    claude)   echo "settings.json CLAUDE.md statusline.sh
+                    skills commands hooks scripts" ;;
+    codex)    echo "config.toml AGENTS.md
+                    skills prompts" ;;
+  esac
+}
+
+# 개인 지침은 personal 모드에서만 담는다
+tool_personal_only() {
+  case "$1" in
+    opencode) echo "AGENTS.md" ;;
+    claude)   echo "CLAUDE.md" ;;
+    codex)    echo "AGENTS.md" ;;
+  esac
+}
+
 echo "== 1/6 파일 수집 (모드: $MODE)"
-echo "  설정 폴더: $CONF"
 
 BIG_LIMIT_MB=5
 : > "$STAGE/SYMLINKS.md"
@@ -152,102 +212,145 @@ copy_dir() { # src dst
   echo "  ⚠️ rsync·tar 를 쓸 수 없어 제외 규칙 없이 복사했습니다: $1" >&2
 }
 
-# opencode 는 단수/복수 디렉터리명을 모두 인정한다
-for d in agent agents command commands skill skills theme themes mode modes plugin plugins; do
-  record_links "$CONF/$d" "$d"
-  copy_dir "$CONF/$d" "$PAY/$d"
+# ── 설치된 도구를 찾아 각각 담는다 ────────────────────────────────
+FOUND=""
+for tool in opencode claude codex; do
+  DIR="$(tool_dir "$tool")"
+  [ -n "$DIR" ] || continue
+
+  # 담을 것이 하나라도 있어야 의미가 있다
+  HAS=0
+  for item in $(tool_items "$tool"); do
+    [ -e "$DIR/$item" ] && { HAS=1; break; }
+  done
+  [ "$HAS" -eq 1 ] || continue
+
+  TDIR="$PAY/$tool"
+  mkdir -p "$TDIR"
+  NFILE=0
+  for item in $(tool_items "$tool"); do
+    src="$DIR/$item"
+    [ -e "$src" ] || continue
+    # 개인 지침은 배포 모드에서 제외
+    if [ "$MODE" = "share" ]; then
+      skip=0
+      for po in $(tool_personal_only "$tool"); do
+        [ "$item" = "$po" ] && skip=1
+      done
+      [ "$skip" -eq 1 ] && continue
+    fi
+    if [ -d "$src" ]; then
+      record_links "$src" "$tool/$item"
+      copy_dir "$src" "$TDIR/$item"
+    else
+      cp "$src" "$TDIR/$item" 2>/dev/null || true
+    fi
+  done
+  NFILE=$(find "$TDIR" -type f 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$NFILE" -eq 0 ]; then
+    rmdir "$TDIR" 2>/dev/null || true
+    continue
+  fi
+  FOUND="$FOUND $tool"
+  echo "  $(tool_label "$tool") — $DIR (${NFILE}개 파일)"
 done
 
-for f in opencode.json opencode.jsonc tui.json package.json; do
-  [ -f "$CONF/$f" ] && cp "$CONF/$f" "$PAY/$f"
-done
-
-# opencode 가 자동으로 읽는 외부 스킬 (~/.claude/skills) — 강의 자산의 본체
-if [ -d "$CLAUDE_SKILLS" ]; then
-  record_links "$CLAUDE_SKILLS" "외부스킬"
-  copy_dir "$CLAUDE_SKILLS" "$PAY/external-claude-skills"
+if [ -z "$FOUND" ]; then
+  echo "오류: 옮길 AI 도구 설정을 찾지 못했습니다." >&2
+  echo "  opencode, Claude Code, codex 중 하나라도 설정이 있어야 합니다." >&2
+  exit 1
 fi
-
-# 개인 카테고리
-if [ "$MODE" = "personal" ]; then
-  [ -f "$CONF/AGENTS.md" ] && cp "$CONF/AGENTS.md" "$PAY/AGENTS.md"
-fi
+printf '%s\n' "${FOUND# }" > "$STAGE/.tools"
 
 find "$PAY" -type l -exec sh -c '[ -e "$1" ] || rm -f "$1"' _ {} \; 2>/dev/null || true
 
-echo "== 2/6 opencode.json 비밀값 제거"
-python3 - "$PAY" <<'PY'
-import json, os, sys
-pay = sys.argv[1]
-p = os.path.join(pay, "opencode.json")
-if not os.path.exists(p):
-    print("  opencode.json 없음 — 건너뜀"); raise SystemExit
+echo "== 2/6 설정 파일의 비밀값 제거"
+
+# opencode.json — 구조를 알기 때문에 정확히 짚어 지운다
+if [ -f "$PAY/opencode/opencode.json" ]; then
+python3 - "$PAY/opencode/opencode.json" <<'PYJ'
+import json, sys
+p = sys.argv[1]
 try:
-    with open(p) as f: cfg = json.load(f)
+    cfg = json.load(open(p))
 except Exception as e:
     print("  ⚠️ opencode.json 파싱 실패:", e); raise SystemExit
-
 hit = []
-# 제공자 API 키
 for name, prov in (cfg.get("provider") or {}).items():
     opts = prov.get("options") or {}
     for k in list(opts):
         if "key" in k.lower() or "token" in k.lower():
-            opts[k] = "<<<REDACTED:provider.%s.options.%s>>>" % (name, k)
-            hit.append("provider.%s.options.%s" % (name, k))
-# MCP 헤더·환경변수
+            opts[k] = "<<<REDACTED:provider.%s.options.%s>>>" % (name, k); hit.append(k)
 for name, srv in (cfg.get("mcp") or {}).items():
     for field in ("headers", "environment"):
         blk = srv.get(field) or {}
         for k, v in list(blk.items()):
-            if isinstance(v, str) and not v.startswith("{env:") and (
-                "key" in k.lower() or "token" in k.lower() or "auth" in k.lower() or "secret" in k.lower()):
-                blk[k] = "<<<REDACTED:mcp.%s.%s.%s>>>" % (name, field, k)
-                hit.append("mcp.%s.%s.%s" % (name, field, k))
+            if isinstance(v, str) and not v.startswith("{env:") and any(
+                    w in k.lower() for w in ("key", "token", "auth", "secret")):
+                blk[k] = "<<<REDACTED:mcp.%s.%s.%s>>>" % (name, field, k); hit.append(k)
+json.dump(cfg, open(p, "w"), indent=2, ensure_ascii=False)
+print("  opencode.json:", ("치환 " + ", ".join(sorted(set(hit)))) if hit else "비밀값 없음")
 
-with open(p, "w") as f:
-    json.dump(cfg, f, indent=2, ensure_ascii=False)
-
-if hit:
-    print("  자리표시자로 치환:", ", ".join(hit))
-else:
-    print("  치환할 비밀값 없음")
-
-# 플러그인 재설치 안내
 plugins = cfg.get("plugin") or []
-lines = ["# 플러그인 복원 안내", "", "새 컴퓨터에서 아래를 실행하세요.", ""]
+lines = []
 for item in plugins:
     mod = item[0] if isinstance(item, list) and item else item
     if isinstance(mod, str) and not mod.startswith((".", "file:")):
         lines.append("opencode plugin %s" % mod)
-    elif isinstance(mod, str):
-        lines.append("# 로컬 플러그인 %s — 파일이 함께 옮겨졌는지 확인하세요" % mod)
-if len(lines) > 4:
-    with open(os.path.join(pay, "PLUGINS.md"), "w") as f:
-        f.write("\n".join(lines) + "\n")
-PY
+if lines:
+    import os
+    open(os.path.join(os.path.dirname(p), "PLUGINS.txt"), "w").write("\n".join(lines) + "\n")
+PYJ
+fi
 
-# opencode.jsonc — 주석이 들어갈 수 있어 JSON 파서로 다시 쓰면 주석이 날아간다.
-# 그래서 값만 정규식으로 치환한다. 이걸 빠뜨리면 jsonc 사용자의 키가 그대로 나간다.
-if [ -f "$PAY/opencode.jsonc" ]; then
-  python3 - "$PAY/opencode.jsonc" <<'PYC'
-import re, sys
+# 주석이 있는 파일(.jsonc, .toml)과 구조를 모르는 파일은 값만 정규식으로 바꾼다.
+# 구조 파싱 후 다시 쓰면 사용자가 적어둔 주석이 날아간다.
+for cfgfile in "$PAY/opencode/opencode.jsonc" "$PAY/codex/config.toml" "$PAY/claude/settings.json"; do
+  [ -f "$cfgfile" ] || continue
+  python3 - "$cfgfile" <<'PYR'
+import re, sys, os
 p = sys.argv[1]
 t = open(p).read()
 hit = []
-def sub(m):
-    hit.append(m.group(1))
-    return '%s"%s": "<<<REDACTED:%s>>>"' % (m.group(0)[:m.start(1)-m.start(0)-1], m.group(1), m.group(1))
-pat = re.compile(r'"((?:[A-Za-z_]*)(?:apiKey|api_key|token|secret|password|Authorization)(?:[A-Za-z_]*))"\s*:\s*"(?!\{env:)(?!<<<REDACTED)[^"]{8,}"', re.I)
 def repl(m):
-    hit.append(m.group(1))
-    return '"%s": "<<<REDACTED:%s>>>"' % (m.group(1), m.group(1))
+    hit.append(m.group("k"))
+    return '%s%s%s<<<REDACTED:%s>>>%s' % (m.group("q1"), m.group("k"), m.group("mid"),
+                                          m.group("k"), m.group("q2"))
+pat = re.compile(
+    r'(?P<q1>["\']?)(?P<k>[A-Za-z_]*(?:apikey|api_key|token|secret|password|authorization|credential)[A-Za-z_]*)'
+    r'(?P<mid>["\']?\s*[:=]\s*["\'])'
+    r'(?!\{env:)(?!<<<REDACTED)(?![/~.])(?!\{\{HOME\}\})'
+    r'[^"\'\n]{8,}(?P<q2>["\'])',
+    re.I)
 t2 = pat.sub(repl, t)
 if hit:
     open(p, "w").write(t2)
-    print("  opencode.jsonc 자리표시자로 치환:", ", ".join(sorted(set(hit))))
+    print("  %s: 치환 %s" % (os.path.basename(p), ", ".join(sorted(set(hit)))))
 else:
-    print("  opencode.jsonc 에 치환할 비밀값 없음")
+    print("  %s: 비밀값 없음" % os.path.basename(p))
+PYR
+done
+
+# Claude Code 플러그인 목록 → 재설치 명령
+if [ -f "$PAY/claude/settings.json" ]; then
+python3 - "$PAY/claude/settings.json" <<'PYC'
+import json, os, sys
+p = sys.argv[1]
+try:
+    d = json.load(open(p))
+except Exception:
+    raise SystemExit
+lines = []
+for name, mp in (d.get("extraKnownMarketplaces") or {}).items():
+    src = (mp.get("source") or {})
+    if src.get("source") == "github" and src.get("repo"):
+        lines.append("claude plugin marketplace add %s" % src["repo"])
+for pid, on in (d.get("enabledPlugins") or {}).items():
+    if on:
+        lines.append("claude plugin install %s" % pid)
+if lines:
+    open(os.path.join(os.path.dirname(p), "PLUGINS.txt"), "w").write("\n".join(lines) + "\n")
+    print("  Claude Code 플러그인 %d개 목록 기록" % len(lines))
 PYC
 fi
 
@@ -339,27 +442,38 @@ fi
 
 echo "== 6/6 매니페스트 작성 및 압축"
 {
-  echo "# opencode 세팅 아카이브"
+  echo "# AI 도구 세팅 아카이브"
   echo
   echo "- 생성일: $(date '+%Y-%m-%d %H:%M')"
   echo "- 모드: $MODE"
-  echo "- opencode: $(opencode --version 2>/dev/null || echo '확인 불가')"
+  echo "- 담긴 도구: $(cat "$STAGE/.tools")"
   echo
   echo "## 포함된 항목"
-  [ -f "$PAY/opencode.json" ] && echo "- opencode.json (비밀값 자리표시자 처리됨)"
-  [ -f "$PAY/AGENTS.md" ] && echo "- AGENTS.md (전역 지침)"
-  for d in agent agents command commands skill skills theme themes mode modes plugin plugins; do
-    [ -d "$PAY/$d" ] && echo "- $d/ ($(find "$PAY/$d" -type f | wc -l | tr -d ' ')개 파일)"
+  for t in $(cat "$STAGE/.tools"); do
+    case "$t" in
+      opencode) lbl="opencode" ;;
+      claude)   lbl="Claude Code" ;;
+      codex)    lbl="codex" ;;
+      *)        lbl="$t" ;;
+    esac
+    echo
+    echo "### $lbl"
+    for e in "$PAY/$t"/*; do
+      [ -e "$e" ] || continue
+      n="$(basename "$e")"
+      if [ -d "$e" ]; then
+        echo "- $n/ ($(find "$e" -type f | wc -l | tr -d ' ')개 파일)"
+      else
+        echo "- $n"
+      fi
+    done
   done
-  [ -d "$PAY/external-claude-skills" ] && \
-    echo "- external-claude-skills/ ($(ls "$PAY/external-claude-skills" | wc -l | tr -d ' ')개) → ~/.claude/skills 로 설치, opencode 가 자동 인식"
-  [ -f "$PAY/PLUGINS.md" ] && echo "- PLUGINS.md (플러그인 재설치 명령)"
-  echo "- CONNECTIONS.md (연결돼 있던 서비스 목록 — 토큰 없음)"
   echo
   echo "## 의도적으로 제외한 것"
-  echo "- ~/.local/share/opencode 전체 (auth.json = API 키, opencode.db = 대화 기록, 로그)"
-  echo "- node_modules (약 60MB — opencode 가 다시 설치)"
-  echo "- GitHub·Firebase·Vercel 토큰 (계정에 묶여 있어 복사해도 동작하지 않음)"
+  echo "- 각 도구의 인증 파일 (API 키·토큰)"
+  echo "- 대화 기록·세션·로그·캐시 (용량이 크고 개인 기록입니다)"
+  echo "- node_modules·플러그인 캐시 (도구가 다시 설치합니다)"
+  echo "- GitHub·Firebase·Vercel 등의 토큰 (계정에 묶여 있어 복사해도 동작하지 않음)"
   if [ -s "$STAGE/SYMLINKS.md" ]; then
     echo
     echo "## 심볼릭 링크였던 항목 ($(grep -c . "$STAGE/SYMLINKS.md")건)"
